@@ -67,9 +67,45 @@ bash tools/purge_public_leaks.sh --repo me/mypkg --keep-from 2.0.0 --leak-path s
 
 > ⚠️ Purging shrinks exposure but **cannot un-distribute** what already shipped. If a removed file carried a secret, rotate it.
 
+### More skills (drop into `.claude/commands/`)
+
+Generic, project-agnostic slash commands — pure prompt-skills, no code or dependencies:
+
+| Skill | What it does |
+|-------|--------------|
+| [`secretguard`](skills/secretguard.md) | Scan git history for leaked secrets with **gitleaks**; purge a file from history (filter-repo) or allowlist a false positive. Never echoes secret values. |
+| [`security-audit`](skills/security-audit.md) | Code + dependency + config audit against the OWASP Top 10 — injection, crypto, access control, secret exposure — with severity-ranked findings. |
+| [`dependencies`](skills/dependencies.md) | Audit / update / prune dependencies and check licenses across pip, npm/yarn, and Docker base images (`pip-audit`, `npm audit`, `safety`). |
+| [`performance`](skills/performance.md) | Profile and optimize: `cProfile`/`memory_profiler`, hotspot hunting, caching, N+1 queries, algorithmic complexity. Measure first. |
+| [`refactor`](skills/refactor.md) | Apply clean-code refactors — extract method, replace conditionals with polymorphism, simplify nested logic — without changing behavior. |
+| [`compare-versions`](skills/compare-versions.md) | Diff two versions of a file/commit/release: structural + behavioral changes, breaking-change risk, and a migration checklist. |
+
+## Standalone tools
+
+CLI utilities you can run directly — all parameterized, no AitherOS dependency:
+
+| Tool | What it does |
+|------|--------------|
+| [`tools/check_exports.py`](tools/check_exports.py) | Validate a Python package: `__all__` entries that don't resolve (ghost exports), `__version__` vs `pyproject.toml` drift, and orphan modules nothing imports. Stdlib-only. |
+| [`tools/validate_compose_ports.py`](tools/validate_compose_ports.py) | Lint docker-compose for **host-port collisions** (across one or many `-f` files), malformed mappings, and unpublished container ports. `--strict` to fail CI. |
+| [`tools/Backup-DockerVolumes.ps1`](tools/Backup-DockerVolumes.ps1) | Snapshot Docker named volumes → timestamped `.tgz` + `manifest.json`, via a throwaway Alpine container. `-Pattern`/`-SkipPattern`/`-DryRun`, auto-prunes old snapshots. |
+
+### PowerShell dev utilities ([`tools/powershell/`](tools/powershell/))
+
+Standalone PS7 helpers — no module, no setup, just `pwsh -File`:
+
+| Script | What it does |
+|--------|--------------|
+| `Invoke-FileGrep.ps1` | Recursive regex content search with context lines. |
+| `Invoke-BulkReplace.ps1` | Regex find/replace across globs, with `-DryRun` and backreferences. |
+| `Invoke-FileDiff.ps1` | Unified diff of two files (or inline strings). |
+| `Invoke-FileSplice.ps1` | Surgically replace a line range in a text file. |
+| `New-GitBranch.ps1` | Create a branch with a conventional prefix (configurable). |
+| `New-GitCommit.ps1` | Stage + commit with Conventional Commits validation. |
+
 ## More coming
 
-Secret-safety scanners and other agent-ops glue are on the way. Star the repo to follow along — and PRs/issues welcome.
+More agent-ops glue is on the way. Star the repo to follow along — and PRs/issues welcome.
 
 ## License
 
