@@ -37,9 +37,39 @@ pwsh -File scripts/Recover-Docker.ps1 -Monitor
 
 📖 Background: [Self-Healing Docker: One Command to Un-Wedge the WSL2 Engine](https://aitherium.com/blog/recovering-docker-from-the-wsl2-wedge/)
 
+### 🛡️ `moat-guard` — keep private code out of your public package
+
+Open-core release hygiene. Three parameterized tools (nothing project-specific — every rule is a flag) plus a `/moat-guard` skill that drives them:
+
+| Tool | Job |
+|------|-----|
+| [`tools/check_package_leaks.py`](tools/check_package_leaks.py) | **Pre-publish gate.** Inspect a built wheel/sdist; fail (non-zero exit) if it bundles forbidden files/imports or is missing a required keystone. Drop it in CI before `twine upload`. |
+| [`tools/find_leaky_releases.py`](tools/find_leaky_releases.py) | **Audit what already shipped.** List index versions below a cutoff and, with `--verify`, download each wheel to *prove* the leak. Prints the exact yank checklist (indexes have no yank API). |
+| [`tools/purge_public_leaks.sh`](tools/purge_public_leaks.sh) | **Scrub the public GitHub surface.** Delete pre-cutoff releases + tags and filter a leaked file out of the repo's entire history (mirror force-push). Dry-run by default. |
+
+```bash
+# CI gate: fail the build if it bundles secrets or imports an internal package
+python tools/check_package_leaks.py dist/mypkg-2.0.0-py3-none-any.whl \
+  --forbid-path '*/secrets*.py' --forbid-import mycorp_internal \
+  --require-file '*/licensing.py'
+
+# Audit a published project and prove which versions leak
+python tools/find_leaky_releases.py mypkg --cutoff 2.0.0 --verify \
+  --forbid-path '*/nanogpt.py'
+
+# Plan a purge (dry-run), then execute once you've read it
+bash tools/purge_public_leaks.sh --repo me/mypkg --keep-from 2.0.0 --leak-path src/secret.py
+bash tools/purge_public_leaks.sh --repo me/mypkg --keep-from 2.0.0 --leak-path src/secret.py \
+  --execute --rewrite-history          # irreversible — breaks pinned installs & forks
+```
+
+**As a Claude Code skill:** copy `skills/moat-guard.md` into `.claude/commands/` and run `/moat-guard check` (pre-publish), `/moat-guard find` (audit), or `/moat-guard purge` (destructive — always dry-runs first, confirms before force-pushing).
+
+> ⚠️ Purging shrinks exposure but **cannot un-distribute** what already shipped. If a removed file carried a secret, rotate it.
+
 ## More coming
 
-Deploy helpers, secret-safety scanners, and other agent-ops glue are on the way. Star the repo to follow along — and PRs/issues welcome.
+Secret-safety scanners and other agent-ops glue are on the way. Star the repo to follow along — and PRs/issues welcome.
 
 ## License
 
