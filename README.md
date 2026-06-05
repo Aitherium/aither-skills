@@ -67,6 +67,44 @@ bash tools/purge_public_leaks.sh --repo me/mypkg --keep-from 2.0.0 --leak-path s
 
 > ⚠️ Purging shrinks exposure but **cannot un-distribute** what already shipped. If a removed file carried a secret, rotate it.
 
+### 🗜️ `model-quantization` — shrink an LLM to 4-bit, locally and free
+
+Make a model fit where bf16 won't — on a smaller GPU, or beside another model on
+the same card. [`tools/quantize_model.py`](tools/quantize_model.py) drives
+[AutoRound](https://github.com/intel/auto-round) and bakes in the gotchas that
+otherwise produce a broken or un-loadable artifact.
+
+The default is **RTN** (round-to-nearest, `--iters 0`): weight-only, no
+calibration data, no forward pass, ~<2 GB peak VRAM, ~1 minute. It runs on your
+**CPU + GPU together** (host-RAM offload) — `$0`, fully local, and enough for
+most models. Calibrated AWQ (`--iters > 0`) is higher quality but needs a real
+GPU, and is **refused on architectures whose calibrated path crashes** (per-layer
+head dims) with a clear steer back to RTN.
+
+```bash
+# Preview the plan — no weight load, no GPU, no write
+python tools/quantize_model.py google/gemma-3-12b-it --dry-run
+
+# RTN 4-bit, local + free (keeps lm_head + multimodal projectors in bf16)
+python tools/quantize_model.py google/gemma-3-12b-it -o ./gemma-3-12b-it-awq
+
+# Calibrated AWQ on a GPU (refused on het-head models — use RTN there)
+python tools/quantize_model.py mistralai/Mistral-7B-Instruct-v0.3 \
+  -o ./mistral-7b-awq --iters 200 --nsamples 128
+```
+
+What it gets right for you: uses **AutoRound, not llm-compressor** (which silently
+downgrades `transformers`); keeps **`lm_head` + vision/audio projectors in bf16**
+(vLLM loaders require it); exports **`compressed-tensors`** so un-quantized modules
+stay plain; and **detects heterogeneous head dims** to avoid the calibrated-mode
+crash. Serve the result with `vllm serve <outdir> --quantization awq_marlin`.
+
+**As a Claude Code skill:** copy `skills/model-quantization.md` into
+`.claude/commands/` and `tools/quantize_model.py` onto disk, then run
+`/model-quantization <model-id> -o <outdir>`. The agent dry-runs first, runs RTN
+by default, and reports the output path + serve command. Needs
+`pip install auto-round torch transformers`.
+
 ### More skills (drop into `.claude/commands/`)
 
 Generic, project-agnostic slash commands — pure prompt-skills, no code or dependencies:
@@ -89,6 +127,7 @@ CLI utilities you can run directly — all parameterized, no AitherOS dependency
 | [`tools/check_exports.py`](tools/check_exports.py) | Validate a Python package: `__all__` entries that don't resolve (ghost exports), `__version__` vs `pyproject.toml` drift, and orphan modules nothing imports. Stdlib-only. |
 | [`tools/validate_compose_ports.py`](tools/validate_compose_ports.py) | Lint docker-compose for **host-port collisions** (across one or many `-f` files), malformed mappings, and unpublished container ports. `--strict` to fail CI. |
 | [`tools/Backup-DockerVolumes.ps1`](tools/Backup-DockerVolumes.ps1) | Snapshot Docker named volumes → timestamped `.tgz` + `manifest.json`, via a throwaway Alpine container. `-Pattern`/`-SkipPattern`/`-DryRun`, auto-prunes old snapshots. |
+| [`tools/quantize_model.py`](tools/quantize_model.py) | Quantize an LLM to 4-bit with AutoRound. **RTN runs free on local CPU+GPU** (`--iters 0`, default); keeps `lm_head`/multimodal projectors in bf16, exports `compressed-tensors`, and refuses calibrated mode on het-head architectures that would crash. `--dry-run` to preview. |
 
 ### PowerShell dev utilities ([`tools/powershell/`](tools/powershell/))
 
