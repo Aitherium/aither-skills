@@ -165,11 +165,11 @@ to run a persistent node). If [aither-adk](https://github.com/Aitherium/aither-a
 Verified end-to-end on a 12-core Linux box: clone → build → `NODE OK`, P2P discovery live. See
 [`skills/omninode-node.md`](skills/omninode-node.md). No credentials, no account, no central server.
 
-### 🧩 The Aither substrate — set up and use aither-adk, AitherNode, AitherConnect & AitherZero
+### 🧩 The Aither substrate — set up and use aither-adk, AitherNode, AitherConnect, AitherZero & AitherMesh
 
-Four skills for the coherent substrate the OmniNode node plugs into. Each is a "set it up, then use
+Five skills for the coherent substrate the OmniNode node plugs into. Each is a "set it up, then use
 it" guide grounded in real commands — standing up compute and having your agents use it is one
-motion, not four projects.
+motion, not five projects.
 
 | Skill | What it sets up |
 |-------|-----------------|
@@ -177,6 +177,7 @@ motion, not four projects.
 | [`aithernode`](skills/aithernode.md) | The *body* — a local MCP server (`adk mcp node`) exposing GPU, local inference, ComfyUI, and files to agents; or bootstrap the box as a full inference node. |
 | [`aitherconnect`](skills/aitherconnect.md) | The seam — `adk connect` / `adk mesh onboard` (`--headscale` behind NAT) to wire a machine, agent, and browser into AitherOS and the mesh. |
 | [`aitherzero`](skills/aitherzero.md) | The provisioner — one `config.psd1` + `bootstrap.ps1` to stand up bare-metal/on-prem/cloud/hybrid, with a generated-from-inventory config editor and `az_*` agent tools. |
+| [`aithermesh`](skills/aithermesh.md) | The fabric — one playbook (`Invoke-AitherPlaybook deploy-mesh-agent`) to create a private WireGuard mesh, join nodes to the overlay, and deploy agents onto them; nodes defined in `config/nodes.yaml`. |
 
 ### More skills (drop into `.claude/commands/`)
 
