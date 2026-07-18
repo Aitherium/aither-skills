@@ -178,6 +178,7 @@ motion, not five projects.
 | [`aitherconnect`](skills/aitherconnect.md) | The seam — `adk connect` / `adk mesh onboard` (`--headscale` behind NAT) to wire a machine, agent, and browser into AitherOS and the mesh. |
 | [`aitherzero`](skills/aitherzero.md) | The provisioner — one `config.psd1` + `bootstrap.ps1` to stand up bare-metal/on-prem/cloud/hybrid, with a generated-from-inventory config editor and `az_*` agent tools. |
 | [`aithermesh`](skills/aithermesh.md) | The fabric — one playbook (`Invoke-AitherPlaybook deploy-mesh-agent`) to create a private WireGuard mesh, join nodes to the overlay, and deploy agents onto them; nodes defined in `config/nodes.yaml`. |
+| [`bonsai-27b`](skills/bonsai-27b.md) | A model to run on a node — PrismML's 1-bit Bonsai-27B (`Q1_0`, 3.8 GB) served on a plain CPU box via the PrismML llama.cpp fork; a 27B model on a laptop. |
 
 ### More skills (drop into `.claude/commands/`)
 
