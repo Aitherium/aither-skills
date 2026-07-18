@@ -105,6 +105,79 @@ crash. Serve the result with `vllm serve <outdir> --quantization awq_marlin`.
 by default, and reports the output path + serve command. Needs
 `pip install auto-round torch transformers`.
 
+### 🔄 `resume-all` — bring back every Claude Code session you lost
+
+A reboot, a crash, or a closed terminal and your Claude Code conversations are gone — not
+deleted, just *unfindable*. You reopen N terminals, `cd` into each project, run `claude`,
+then `/resume` and squint at a list of UUIDs trying to remember which was which.
+
+[`scripts/Resume-ClaudeSessions.ps1`](scripts/Resume-ClaudeSessions.ps1) reads Claude Code's
+own session journals (`~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`), recovers each
+session's **AI title, last prompt, working directory, git branch and last-active time**, lets
+you pick, and reopens them — each in its own terminal tab or tmux window. Read-only against
+your history; it never mutates the journals.
+
+```bash
+# interactive picker — choose which to bring back
+pwsh -File scripts/Resume-ClaudeSessions.ps1
+
+# reopen the most-recent session for every project directory, no prompt
+pwsh -File scripts/Resume-ClaudeSessions.ps1 -PerDir -All
+
+# only sessions matching some text, from the last day
+pwsh -File scripts/Resume-ClaudeSessions.ps1 -Filter payments -LookbackHours 24
+
+# over SSH? resume into tmux — the windows survive a disconnect
+pwsh -File scripts/Resume-ClaudeSessions.ps1 -Tmux -Select 1,3
+```
+
+**Cross-platform** (PowerShell 7): Windows Terminal tabs on Windows, tmux windows anywhere,
+Terminal.app on macOS — and if none of those exist it prints the commands rather than
+pretending it launched something. `-DryRun` prints the resolved session ids to stdout.
+
+> ⚠️ The gotcha this exists to solve: sub-agent sidechains (`agent-*.jsonl`) and workflow
+> journals are rewritten constantly, so by write-time they **crowd out your real sessions**.
+> A naive "most recently modified N journals" scan surfaces almost none of them. This filters
+> to genuine top-level conversations *before* truncating the scan window.
+
+**As a Claude Code skill:** copy `skills/resume-all.md` into `.claude/commands/` and the script
+onto disk, then run `/resume-all` (or `/resume-all all`, or `/resume-all <filter text>`).
+
+### 🕸️ `omninode-node` — join the OmniNode P2P inference mesh in one command
+
+[OmniNode Protocol](https://github.com/SUM-INNOVATION/OmniNode-Protocol) (by **SUM-INNOVATION**) is a
+trustless, peer-to-peer network that pools ordinary machines into a fabric big enough to run models no
+single device could hold — *any device with a chip can become a node*. Standing one up shouldn't be a
+ten-step wiki page.
+
+[`scripts/omninode-node-up.sh`](scripts/omninode-node-up.sh) takes a fresh machine (Linux / macOS /
+Windows-WSL2) from **nothing installed → a live, discoverable node**: detect hardware → install Rust if
+missing → clone + build `omni-node` → verify two peers discover each other over libp2p/mDNS (or `--listen`
+to run a persistent node). If [aither-adk](https://github.com/Aitherium/aither-adk) is present it can also
+`adk mesh onboard` the node so your agents use it — one motion, not two projects.
+
+```bash
+./scripts/omninode-node-up.sh          # build + self-verify P2P discovery
+./scripts/omninode-node-up.sh --listen # run a persistent mesh node
+./scripts/omninode-node-up.sh --adk    # + enroll into AitherMesh for adk agents
+```
+
+Verified end-to-end on a 12-core Linux box: clone → build → `NODE OK`, P2P discovery live. See
+[`skills/omninode-node.md`](skills/omninode-node.md). No credentials, no account, no central server.
+
+### 🧩 The Aither substrate — set up and use aither-adk, AitherNode, AitherConnect & AitherZero
+
+Four skills for the coherent substrate the OmniNode node plugs into. Each is a "set it up, then use
+it" guide grounded in real commands — standing up compute and having your agents use it is one
+motion, not four projects.
+
+| Skill | What it sets up |
+|-------|-----------------|
+| [`aither-adk`](skills/aither-adk.md) | The agent toolkit — `pip install aither-adk` → `adk onboard --quick` → `adk run`. Your model, your loop, your data on your box; manage from the portal. |
+| [`aithernode`](skills/aithernode.md) | The *body* — a local MCP server (`adk mcp node`) exposing GPU, local inference, ComfyUI, and files to agents; or bootstrap the box as a full inference node. |
+| [`aitherconnect`](skills/aitherconnect.md) | The seam — `adk connect` / `adk mesh onboard` (`--headscale` behind NAT) to wire a machine, agent, and browser into AitherOS and the mesh. |
+| [`aitherzero`](skills/aitherzero.md) | The provisioner — one `config.psd1` + `bootstrap.ps1` to stand up bare-metal/on-prem/cloud/hybrid, with a generated-from-inventory config editor and `az_*` agent tools. |
+
 ### More skills (drop into `.claude/commands/`)
 
 Generic, project-agnostic slash commands — pure prompt-skills, no code or dependencies:
