@@ -18,6 +18,34 @@ aither-skills/
 
 ## Skills
 
+### 🌐 `website-as-code` — GitHub Pages + Cloudflare Tunnel + automated fallback (f*** Wix)
+
+Your website as three free, composable layers you own end to end: a **GitHub Pages** frontend
+(deploys on push, served by GitHub's CDN — cannot be taken down by your hardware), a
+**Cloudflare Tunnel** backend from ANY machine (home PC or $5 VPS — no port-forwarding, no
+static IP, TLS at the edge), and a **fallback Worker** on the dynamic hostnames that serves a
+last-good snapshot or a branded maintenance page during an outage — **never Cloudflare's raw
+error 530/1033**. Run the same tunnel on a second machine and Cloudflare fails over between
+them automatically. Total cost: the domain.
+
+**As a Claude Code skill:** copy `skills/website-as-code.md` into `.claude/commands/` and run
+`/website-as-code yourdomain.com --backend-port 8000`. The worker template + routes example
+live in `scripts/fallback-worker/`. The one rule it will drill into you: a hostname on the
+tunnel but missing from the worker routes shows a raw Cloudflare error during an outage —
+add both in the same commit, every time.
+
+### 📄 `repo-to-website` — any repo becomes a real website, not a raw README
+
+Point it at a repo and get a **proper landing page** on GitHub Pages: hero with the project's
+name and pitch, install command, your README rendered exactly like github.com renders it,
+dark-mode aware, self-contained (no CDNs) — live at `https://<owner>.github.io/<repo>/` and
+redeploying itself on every push via Actions. Modes for docs sites (`--docs`), SPA builds
+(`--spa dist`), or the 60-second Jekyll-theme path (`--plain`). Chain `--domain` into
+`/website-as-code` for a custom domain + backend + fallback.
+
+**As a Claude Code skill:** copy `skills/repo-to-website.md` into `.claude/commands/` and run
+`/repo-to-website owner/repo`. Edit README, push — the site updates itself.
+
 ### 🐳 `recover-docker` — un-wedge Docker Desktop's WSL2 engine
 
 Docker Desktop on Windows wedges its WSL2 Linux engine: the `docker` API returns **`500 Internal Server Error`**, or `docker stop`/recreate dies with **`tried to kill container, but did not receive an exit event`** (common on nvidia-runtime / GPU containers). The GUI looks healthy; the daemon is dead.

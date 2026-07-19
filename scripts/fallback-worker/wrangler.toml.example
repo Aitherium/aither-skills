@@ -1,0 +1,14 @@
+# wrangler.toml — fallback worker routes.
+# EVERY dynamic hostname you want protected must be listed EXPLICITLY: a host that is
+# on your tunnel but NOT in this list shows Cloudflare's raw 1033/521 error page during
+# an outage. When you add a hostname to the tunnel, add it here in the same change.
+name = "site-fallback"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+routes = [
+  { pattern = "api.example.com/*", zone_name = "example.com" },
+  { pattern = "app.example.com/*", zone_name = "example.com" },
+  # NOT the apex: the apex should be plain DNS to GitHub Pages (grey cloud) — it is the
+  # layer that survives even Cloudflare-account problems. Static never needs a fallback.
+]
