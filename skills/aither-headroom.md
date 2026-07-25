@@ -28,7 +28,8 @@ The master switch defaults **OFF** (flip only after you've confirmed savings on 
 ```bash
 # Per-process, no restart (env wins over config):
 export AITHER_HEADROOM_ENABLED=true
-# Or durably: set enabled: true in AitherOS/config/headroom.yaml (bind-mounted → restart).
+# Or durably: set enabled: true in your deployment's config/headroom.yaml, then restart
+# the service (mount it as config so a restart is enough — no rebuild).
 ```
 
 The sidecar is plain HTTP on the internal network at `http://aither-headroom:8787`
