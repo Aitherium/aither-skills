@@ -23,7 +23,7 @@ curl -sk https://localhost:8153/codegraph/stats
 
 # 2) Do indexed paths still EXIST in the running container?
 curl -sk https://localhost:8153/codegraph/search?q=YourCoreClass | head
-# ⚠️ If source_path shows a layout you no longer deploy (/app/AitherOS/services/...
+# ⚠️ If source_path shows a layout you no longer deploy (e.g. /app/old-root/services/...
 #    when the code is at /app/services/...), every lookup misses. Index looks huge, hit rate ~0.
 
 # 3) Does a symbol you KNOW exists come back?

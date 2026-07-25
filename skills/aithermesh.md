@@ -8,7 +8,10 @@ them — idempotent, one playbook, or step by step.
 
 ## Set up the mesh (one command)
 
-With the AitherZero environment loaded (`Import-Module ./.PRODUCTS/.AITHERZERO/AitherZero.psd1`):
+With the AitherZero environment loaded — clone
+[AitherZero](https://github.com/Aitherium/AitherZero), run `./build.ps1` (it generates the
+manifest; there is no committed one), then `Import-Module ./AitherZero.psd1 -Force`. Full setup in
+the [`aitherzero`](aitherzero.md) skill:
 
 ```powershell
 # End-to-end: ensure the control plane, join every node in your fleet, deploy agents, verify.
