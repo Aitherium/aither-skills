@@ -121,27 +121,80 @@ function C([string]$code, [string]$text) {
 function Get-ClaudeSessionMeta {
     <# Recover a session's metadata from the tail of its journal. Claude rewrites
        the latest ai-title / last-prompt / cwd / timestamp near the end, so a
-       bounded tail read is both fast (works on multi-MB files) and accurate. #>
+       bounded RAW tail read + last-match regex extraction is accurate and ~ms
+       even on 50MB journals. The previous implementation (Get-Content -Tail 120
+       piped line-by-line through ConvertFrom-Json) cost ~70ms/file — ×120 files
+       that was the entire "why does listing take a minute" bug. #>
     param([string]$Path)
 
-    $id     = [IO.Path]::GetFileNameWithoutExtension($Path)
-    $title  = $null; $lastPrompt = $null; $cwd = $null; $ts = $null; $branch = $null
+    $id = [IO.Path]::GetFileNameWithoutExtension($Path)
 
-    try {
-        $tail = Get-Content -LiteralPath $Path -Tail 120 -ErrorAction Stop
-    } catch { $tail = @() }
-
-    foreach ($line in $tail) {
-        if ([string]::IsNullOrWhiteSpace($line)) { continue }
-        try { $o = $line | ConvertFrom-Json -Depth 8 } catch { continue }
-        switch ($o.type) {
-            'ai-title'    { if ($o.aiTitle)    { $title = $o.aiTitle } }
-            'last-prompt' { if ($o.lastPrompt) { $lastPrompt = $o.lastPrompt } }
-        }
-        if ($o.cwd)        { $cwd = $o.cwd }
-        if ($o.timestamp)  { $ts = $o.timestamp }
-        if ($o.gitBranch)  { $branch = $o.gitBranch }
+    # Raw tail read. Journals are append-mostly JSONL and the metadata we want is
+    # rewritten near the end; 256KB covers it in practice. A single giant line
+    # (multi-MB pasted tool result) can push it further back, so retry once with
+    # a 4MB window if no cwd surfaced. FileShare includes Delete so a journal
+    # being rotated/removed mid-read degrades to "skip", not a crash.
+    $readTail = {
+        param([string]$p, [long]$take)
+        try {
+            $fs = [IO.File]::Open($p, [IO.FileMode]::Open, [IO.FileAccess]::Read,
+                                  ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+            try {
+                $n = [int][Math]::Min($take, $fs.Length)
+                if ($n -le 0) { return '' }
+                $null = $fs.Seek(-$n, [IO.SeekOrigin]::End)
+                $buf  = [byte[]]::new($n)
+                $read = $fs.Read($buf, 0, $n)
+                [Text.Encoding]::UTF8.GetString($buf, 0, $read)
+            } finally { $fs.Dispose() }
+        } catch { '' }
     }
+
+    # Walk the tail lines NEWEST-FIRST and take each field from the first line
+    # whose TOP-LEVEL property carries it. The Contains precheck keeps this cheap
+    # (a line is JSON-parsed only if it can possibly hold a wanted field, and each
+    # field stops looking once found); parsing the full line — instead of a bare
+    # regex over the raw text — is what makes it correct: an unescaped nested key
+    # inside a structured toolUseResult (e.g. a nested "timestamp") can never
+    # shadow the real top-level value. Values inside message strings are
+    # backslash-escaped (\"key\":) in the raw bytes, so the '"key":' needle
+    # cannot false-positive on content either.
+    $extract = {
+        param([string]$text)
+        $found = @{}
+        $want  = [System.Collections.Generic.List[string]]@('aiTitle', 'lastPrompt', 'cwd', 'timestamp', 'gitBranch')
+        $lines = $text.Split("`n")
+        for ($i = $lines.Count - 1; $i -ge 0 -and $want.Count -gt 0; $i--) {
+            $line = $lines[$i]
+            $mayHold = $false
+            foreach ($k in $want) {
+                if ($line.Contains('"' + $k + '":')) { $mayHold = $true; break }
+            }
+            if (-not $mayHold) { continue }
+            try { $o = $line | ConvertFrom-Json } catch { continue }  # partial first line etc.
+            foreach ($k in @($want)) {
+                $v = $o.$k
+                if ($v -is [string] -and $v) {
+                    $found[$k] = $v
+                    $null = $want.Remove($k)
+                }
+            }
+        }
+        $found
+    }
+
+    $text = & $readTail $Path 262144
+    $f    = & $extract $text
+    if (-not $f['cwd']) {
+        $text = & $readTail $Path 4194304
+        $f    = & $extract $text
+    }
+
+    $title      = $f['aiTitle']
+    $lastPrompt = $f['lastPrompt']
+    $cwd        = $f['cwd']
+    $ts         = $f['timestamp']
+    $branch     = $f['gitBranch']
 
     if (-not $title) { $title = $id.Substring(0, [Math]::Min(8, $id.Length)) }
 
@@ -161,6 +214,11 @@ function Get-ClaudeSessionMeta {
     if ($ts) {
         $parsed = [datetimeoffset]::MinValue
         if ([datetimeoffset]::TryParse($ts, [ref]$parsed)) { $when = $parsed.LocalDateTime }
+    }
+    if (-not $when) {
+        # No parseable timestamp in the tail window — the journal's mtime is the
+        # honest approximation, and far better than sorting the session as "? age".
+        try { $when = [IO.File]::GetLastWriteTime($Path) } catch { }
     }
 
     [pscustomobject]@{
@@ -277,7 +335,14 @@ if (-not $files) {
     exit 0
 }
 
-$sessions = foreach ($f in $files) { Get-ClaudeSessionMeta -Path $f.FullName }
+# Parallel parse: each file is an independent tail-read, and even at ~ms each,
+# $Scan of them serially still adds up on a cold/AV-scanned disk. Order doesn't
+# matter — everything is re-sorted by When below.
+$metaDef = ${function:Get-ClaudeSessionMeta}.ToString()
+$sessions = @($files | ForEach-Object -Parallel {
+    ${function:Get-ClaudeSessionMeta} = $using:metaDef
+    Get-ClaudeSessionMeta -Path $_.FullName
+} -ThrottleLimit 8)
 
 # Filters
 $sessions = $sessions | Where-Object { $_.Cwd }
@@ -436,6 +501,12 @@ if ($DryRun) {
     exit 0
 }
 
+# Resolve pwsh to an ABSOLUTE path once. Wt's new-tab resolves a bare `pwsh`
+# against the spawned tab's PATH, which is not guaranteed to carry pwsh; a full
+# path removes that failure mode entirely.
+$script:PwshPath = (Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue).Source
+if (-not $script:PwshPath) { $script:PwshPath = 'pwsh' }
+
 function New-TabArgs {
     param($Session, [bool]$Lead)
     $a = [System.Collections.Generic.List[string]]::new()
@@ -443,7 +514,29 @@ function New-TabArgs {
     $a.Add('new-tab')
     $a.Add('-d');     $a.Add($Session.Cwd)
     $a.Add('--title'); $a.Add($Session.Title)
-    $a.Add('pwsh'); $a.Add('-NoExit'); $a.Add('-Command'); $a.Add("claude --resume $($Session.Id)")
+    # Scrub inherited colour-suppression before starting claude. When this script is
+    # run FROM a Claude Code session, that session exports NO_COLOR=1 (and renders
+    # PlainText) so its own tool output comes back clean. wt is spawned as a child of
+    # that process, so the new window — and every pwsh tab in it, and every claude
+    # inside those tabs — inherits NO_COLOR=1 and resumes fully monochrome. Verified
+    # live 2026-07-20: probe tab reported NO_COLOR=[1], OutputRendering=PlainText.
+    # Launching from a normal terminal was never affected, which is why this looked
+    # like a Windows Terminal/profile problem and is not one.
+    # The payload MUST be passed as -EncodedCommand, not -Command: wt splits its own
+    # command line on semicolons EVEN INSIDE QUOTED ARGUMENTS (they'd need \; escaping).
+    # With -Command, wt chopped this string at each ';' — the tab ran only the
+    # Remove-Item prefix and the orphaned " claude --resume <id>" tail became a bogus
+    # separate launch that died with 0x80070002 "file not found" for EVERY session
+    # (broke all resumes 2026-07-20 → 2026-07-22). Base64 has no ';', so it's immune.
+    # Also scrub the parent Claude session's identity vars — when this script runs FROM
+    # a Claude Code session, the tabs inherit CLAUDE_CODE_SESSION_ID etc. of the CALLER,
+    # polluting the resumed instance.
+    $payload = "Remove-Item Env:NO_COLOR, Env:CLAUDECODE, Env:CLAUDE_CODE_SESSION_ID, " +
+               "Env:CLAUDE_CODE_CHILD_SESSION, Env:CLAUDE_CODE_ENTRYPOINT, Env:CLAUDE_PID " +
+               "-ErrorAction SilentlyContinue; `$PSStyle.OutputRendering='Ansi'; " +
+               "claude --resume $($Session.Id)"
+    $b64 = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($payload))
+    $a.Add($script:PwshPath); $a.Add('-NoExit'); $a.Add('-EncodedCommand'); $a.Add($b64)
     $a
 }
 
@@ -467,7 +560,10 @@ if ($useTmux) {
 
     foreach ($s in $chosen) {
         $name = Get-TmuxWindowName $s.Title
-        $cmd  = "claude --resume $($s.Id)"
+        # Same inherited-NO_COLOR scrub as the wt path (see New-TabArgs). Worse here:
+        # a tmux SERVER started from a Claude Code session keeps that environment for
+        # every window created later, so the monochrome outlives the launching session.
+        $cmd  = "unset NO_COLOR; claude --resume $($s.Id)"
         if (-not $sessionExists) {
             & $tmuxCmd.Source new-session -d -s $TmuxSession -n $name -c $s.Cwd $cmd
             $sessionExists = $true
@@ -490,8 +586,18 @@ if ($useTmux) {
 
 if ($IsMacOS -and -not $wt) {
     foreach ($s in $chosen) {
-        # Escape for AppleScript's double-quoted string literals.
-        $esc = ("cd " + $s.Cwd + " && claude --resume " + $s.Id) -replace '\\', '\\\\' -replace '"', '\"'
+        # Escape for AppleScript's double-quoted string literals. The leading
+        # `unset NO_COLOR` is the same scrub as the wt/tmux paths (see New-TabArgs):
+        # launched from a Claude Code session, this process carries NO_COLOR=1 and
+        # Terminal.app would inherit it, resuming every tab monochrome. It contains
+        # no backslash or quote, so it does not interact with the escaping below.
+        # The cwd is single-quoted for the SHELL: unquoted, a path containing a
+        # space ("/Users/x/my proj") splits into two words and the cd fails, so the
+        # tab opens in the wrong directory and the resume dies. The wt/tmux paths
+        # never had this — they pass the cwd as its own argv element. Single quotes
+        # also survive the AppleScript escaping below, which only touches \ and ".
+        $shell = "unset NO_COLOR; cd '" + $s.Cwd + "' && claude --resume " + $s.Id
+        $esc = $shell -replace '\\', '\\\\' -replace '"', '\"'
         & osascript -e "tell application `"Terminal`" to do script `"$esc`"" | Out-Null
     }
     Write-Host ''
@@ -517,21 +623,32 @@ if (-not $wt) {
     exit 0
 }
 
+# Launch via the call operator, NOT Start-Process -ArgumentList. Start-Process
+# flattens an argument array into a single string WITHOUT quoting elements that
+# contain spaces, so a multi-word --title (any AI-generated session title with a
+# space) leaks its trailing words into the command position; wt then tries to
+# launch the leftover word as an executable and dies with
+# `0x80070002 file not found`. Observed: every space-containing title failed,
+# every no-space slug title succeeded. PowerShell 7's native invocation (`&`
+# with a splatted array) builds a correctly-quoted argv, so wt sees --title's
+# value as a single token. wt is a launcher that returns immediately, so this
+# does not block on the spawned tabs.
 if ($SeparateWindows) {
     foreach ($s in $chosen) {
-        $args = @('-w', 'new') + (New-TabArgs -Session $s -Lead $true)
-        Start-Process $wt.Source -ArgumentList $args
+        # $wtArgs, not $args — $args is PowerShell's fixed-size automatic variable
+        $wtArgs = @('-w', 'new') + (New-TabArgs -Session $s -Lead $true)
+        & $wt.Source @wtArgs
     }
 }
 else {
     # All tabs in one new window.
-    $args = [System.Collections.Generic.List[string]]::new()
+    $wtArgs = [System.Collections.Generic.List[string]]::new()
     $lead = $true
     foreach ($s in $chosen) {
-        (New-TabArgs -Session $s -Lead $lead) | ForEach-Object { $args.Add($_) }
+        foreach ($a in (New-TabArgs -Session $s -Lead $lead)) { $wtArgs.Add($a) }
         $lead = $false
     }
-    Start-Process $wt.Source -ArgumentList $args
+    & $wt.Source @wtArgs
 }
 
 Write-Host ''

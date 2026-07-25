@@ -29,6 +29,12 @@ Do this:
      directory** (title · age · last prompt under each cwd heading), then ask which
      numbers to resume. Wait for their answer.
    - **`all`** → resume every listed session.
+
+   Liveness check first, whatever the argument: a session whose `when` is within
+   the last ~3 minutes is probably LIVE in another window right now — its journal
+   is still being written. Resuming it spawns a DUPLICATE. Mark those
+   `⚡ likely live — skipped`, exclude them from `all`, and only resume one if the
+   user names it explicitly.
    - **a list like `1,3,5-7`** → resume those indices.
    - **anything else** → treat it as a `-Filter` substring; re-run step 1 adding
      `-Filter "<text>"`, then confirm the matches with the user.
@@ -55,6 +61,18 @@ Do this:
    windows if tmux is present, Terminal.app on macOS. Add `-Tmux` to force tmux —
    **that's the one to use over SSH**, since tmux windows survive a disconnect.
    Add `-SeparateWindows` for separate windows instead of tabs.
+
+   Resumed tabs come up in COLOR even when you launch this from inside a Claude
+   Code session. That is not free: Claude Code exports `NO_COLOR=1` to its
+   subprocesses so tool output comes back clean, and the terminal spawned by this
+   engine is one of those subprocesses — so the new window, every shell in it, and
+   every `claude` inside those shells would inherit `NO_COLOR=1` and render
+   monochrome. The engine scrubs it per tab (`Remove-Item Env:NO_COLOR` on the wt
+   path, `unset NO_COLOR` on tmux). Keep that scrub if you edit the launch command.
+   It must DELETE the variable, not blank it — the consumer tests
+   `!("NO_COLOR" in process.env)`, i.e. presence, so `NO_COLOR=""` still suppresses
+   colour. Worst on tmux: a server started from a Claude session keeps that
+   environment for every window created later.
 
 4. Report which sessions were reopened (titles + directories). If tmux was used,
    tell the user the attach command the engine printed.
