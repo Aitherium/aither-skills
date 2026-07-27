@@ -36,6 +36,7 @@ USAGE
     docker-net-doctor.py binds           # dnsmasq bind-race detector
     docker-net-doctor.py clients         # musl vs glibc resolver behaviour
     docker-net-doctor.py policy          # true resolv.conf per container
+    docker-net-doctor.py egress          # find Up+healthy containers with NO network
 
 Exit 0 clean, 1 defect found, 2 could-not-determine (which is a FAILURE, not a
 pass - a check that cannot run tells you nothing).
@@ -46,6 +47,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 
 RC_OK, RC_DEFECT, RC_UNKNOWN = 0, 1, 2
 _findings: list[tuple[str, str]] = []
@@ -276,6 +278,153 @@ def check_policy(limit: int = 12) -> None:
         _defect("policy:divergent", f"{len(seen)} distinct resolver policies in use - expect uneven failures")
 
 
+# -- 6. EGRESS - the container that is Up, healthy, and severed ---------------
+
+def check_egress(target: str = "", limit: int = 500) -> None:
+    """Find containers with a working route table and ZERO actual egress.
+
+    This is the check `docker ps` structurally cannot do. A container whose veth
+    pair has broken keeps a correct /proc/net/route, keeps its IP, keeps
+    reporting `Up (healthy)` if its healthcheck is local -- and cannot reach
+    anything. One was found running that way for 19 HOURS.
+
+    The tell that saves you an hour: such a container also times out against
+    `127.0.0.11`, which lives in its OWN netns. A container cannot fail to reach
+    its own loopback resolver over the network. If 127.0.0.11 times out too, stop
+    looking at DNS -- the interface is dead.
+
+    Probes from a throwaway alpine sharing the TARGET's network namespace, so it
+    needs no python/nc/bash inside the container being tested.
+    """
+    import concurrent.futures as cf
+
+    print("\n== EGRESS (the check `docker ps` cannot do) ==")
+    rc, out = _run(["docker", "ps", "--format", "{{.Names}}"])
+    if rc != 0:
+        _defect("egress", "docker ps failed")
+        return
+    names = [n for n in out.split() if n][:limit]
+    if not names:
+        _defect("egress", "no running containers")
+        return
+
+    # Each container must be probed against a peer on ITS OWN network. Using one
+    # global target is WRONG and mass-false-positives: a container on a different
+    # bridge (buildkit, a separate compose project, a 172.27.x stack) correctly
+    # cannot resolve a name that only exists on 172.18.x. Measured: that mistake
+    # reported 24 "severed" containers that were all simply cross-network.
+    net_of: dict[str, list[str]] = {}
+    for name in names:
+        rc2, raw = _run([
+            "docker", "inspect", name,
+            "--format", "{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}",
+        ], timeout=20)
+        for net in (raw or "").split():
+            net_of.setdefault(net, []).append(name)
+
+    # peer target per container: another container on a shared network
+    peer: dict[str, str] = {}
+    for net, members in net_of.items():
+        if len(members) < 2:
+            continue  # a lone container on its own network has no peer to test
+        for m in members:
+            peer.setdefault(m, next(p for p in members if p != m))
+
+    probeable = [n for n in names if n in peer]
+    skipped = len(names) - len(probeable)
+    print(f"  probing {len(probeable)} container(s) against a peer on their OWN network"
+          + (f" ({skipped} skipped: no same-network peer)" if skipped else ""))
+
+    def probe(name: str) -> tuple[str, bool, str]:
+        # `docker exec <c> getent hosts <name>` on purpose, NOT a sidecar container
+        # sharing the target's netns. The sidecar approach is the obvious design and
+        # it does not work at fleet scale: it spawns a container per target, which is
+        # itself a load event, and load is precisely what induces the fault being
+        # measured. Worse, it proved unreliable even on a SINGLE healthy container
+        # probed alone -- `aitheros-secrets` failed the sidecar ping while `getent`
+        # from inside it succeeded and it was actively serving traffic.
+        #
+        # getent needs nothing installed (glibc and musl both provide it), costs one
+        # exec, and exercises the resolver AND egress in one shot.
+        tgt = peer[name]
+        rc3, out3 = _run(
+            ["docker", "exec", name, "getent", "hosts", tgt], timeout=25
+        )
+        # 127 / "executable file not found" means the IMAGE has no getent (scratch,
+        # distroless, busybox-less). That is "cannot probe", NOT "severed" -- and
+        # reporting it as a fault is the same could-not-determine-read-as-defect
+        # error this whole tool exists to prevent. Measured: 3 of 20 flagged
+        # containers were only missing the binary.
+        if rc3 == 127 or "executable file not found" in (out3 or ""):
+            return name, True, "SKIP:no-getent"
+        return name, rc3 == 0, tgt
+
+    suspects: list[tuple[str, str]] = []
+    # Low concurrency on purpose: see the comment in probe(). A fast scan that
+    # measures its own load is worse than a slow scan that is correct.
+    with cf.ThreadPoolExecutor(max_workers=3) as pool:
+        for name, ok, gw in pool.map(probe, probeable):
+            if not ok:
+                suspects.append((name, gw))
+
+    # QUIET PASS. The wide pass is a SCREEN, never a verdict: it runs under load
+    # it generated itself. Let that settle, then re-probe only the suspects, one
+    # at a time. A severed veth stays severed; a container merely starved by the
+    # scan comes back.
+    severed: list[str] = []
+    if suspects:
+        print(f"  {len(suspects)} suspect(s) from the wide pass - re-verifying quietly")
+        time.sleep(8)
+        # TWO separated quiet rounds, and only a container that fails BOTH counts.
+        # This is the load-bearing distinction and it took four wrong versions to
+        # find: `getent` exercises DNS, and on a fleet with a bursty resolver a
+        # single quiet round reports a DIFFERENT set of containers every run. A
+        # severed veth is STABLE -- it fails every round, forever. A resolver burst
+        # is not. Reporting an unstable set as "severed" sends you restarting
+        # healthy containers to chase a DNS fault.
+        def quiet_round() -> set:
+            bad = set()
+            for name, tgt in suspects:
+                if not any(
+                    _run(["docker", "exec", name, "getent", "hosts", tgt],
+                         timeout=25)[0] == 0
+                    for _ in range(2)
+                ):
+                    bad.add(name)
+            return bad
+
+        round_a = quiet_round()
+        time.sleep(15)
+        round_b = quiet_round()
+        severed = sorted(round_a & round_b)
+        intermittent = sorted(round_a ^ round_b)
+        print(f"  {len(suspects) - len(round_a | round_b)} suspect(s) were scan artifacts")
+        if intermittent:
+            print(f"  {len(intermittent)} INTERMITTENT (failed one round, not the other) —")
+            print("     consistent with a bursty resolver, NOT a severed interface:")
+            print(f"     {', '.join(intermittent[:8])}")
+
+    if severed:
+        _defect(
+            "egress:severed",
+            f"{len(severed)} of {len(probeable)} container(s) failed BOTH quiet rounds "
+            "(STABLE failure — a severed interface or a consistently-broken resolver "
+            "path; confirm per-container before restarting anything): "
+            + ", ".join(severed[:8]),
+        )
+        print("  -> CONFIRM before acting. This probe uses getent, so it cannot by")
+        print("     itself separate a dead interface from a dead resolver path.")
+        print("     The distinguishing test on ONE container:")
+        print("       docker exec <c> cat /proc/net/route      # route sane?")
+        print("       <raw TCP to a known peer IP, no DNS>     # egress alive?")
+        print("     If raw TCP to an IP also times out while the route is correct,")
+        print("     the veth is dead: `docker restart <name>` rebuilds it.")
+        print("     `docker network disconnect`+`connect` does NOT reliably fix it")
+        print("     (measured: same IP reassigned, still severed).")
+    else:
+        _ok("egress", f"all {len(probeable)} probeable containers reach a same-network peer")
+
+
 def main() -> int:
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
     if not shutil.which("docker"):
@@ -292,6 +441,8 @@ def main() -> int:
         check_clients()
     if mode in ("all", "policy"):
         check_policy()
+    if mode in ("all", "egress"):
+        check_egress()
 
     print("\n" + "=" * 62)
     if _findings:

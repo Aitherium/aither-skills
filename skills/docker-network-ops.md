@@ -177,6 +177,40 @@ again — **restarting is not a fix**, it's a way to lose the evidence.
    check that never ran. `ls` the thing you searched before trusting any absence.
 6. **A clean run on an idle box proves little.** These faults are load-shaped. Re-run under
    real load — a large build, a recreate wave — before calling anything healthy.
+7. **Your scan can generate the load that produces its own false positives.** This is the
+   nastiest one, because the tool looks like it's working. A fleet-wide egress probe that
+   spawns one throwaway container per target *is* a load event, and load is exactly what
+   induces the fault being measured. Measured on a **healthy** 167-container fleet: the
+   wide pass reported **108 severed**; adding in-loop retries still reported **57**; every
+   named container passed the identical command when run alone. In-loop retries cannot
+   rescue you — they fire while the storm is still running.
+   **The fix is a two-phase shape: treat the wide pass as a SCREEN, then re-verify only
+   the suspects sequentially after the load settles.** A severed veth stays severed; a
+   container merely starved by your scan comes back.
+
+## The container that is `Up`, `healthy`, and completely severed
+
+A broken veth pair leaves a container with a correct routing table, its IP, a green
+healthcheck — and no network at all. One ran that way for **19 hours** undetected.
+
+**The tell that saves you an hour:** it also times out against `127.0.0.11`. That resolver
+lives in the container's *own* network namespace, so a container cannot fail to reach it
+*over the network*. If `127.0.0.11` times out too, stop looking at DNS — the interface is
+dead. Confirm with raw TCP to a known-good IP; if that times out while `/proc/net/route`
+is correct, it's the veth.
+
+```bash
+docker-net-doctor.py egress          # screens every container, then re-verifies quietly
+docker restart <name>                # rebuilds the veth
+```
+
+`docker network disconnect` + `connect` does **not** reliably fix it (measured: same IP
+reassigned, still severed). `docker inspect` shows the interface attached the whole time,
+so the container-level view agrees with the lie.
+
+The durable defect is the **blindness**, not the veth: a healthcheck that never leaves the
+container passes in exactly this case. Any service with outbound dependencies needs a
+healthcheck that performs a real dependency round-trip.
 
 ## Application layer — infra alone cannot fix this
 
