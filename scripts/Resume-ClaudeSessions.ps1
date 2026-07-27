@@ -69,6 +69,47 @@
 .PARAMETER TmuxSession
     Name of the tmux session to create/reuse with -Tmux. Default: claude
 
+.PARAMETER Snapshot
+    Capture the sessions that are LIVE RIGHT NOW (one per running `claude`
+    process) to -SnapshotPath and exit without launching anything. Run this
+    before a reboot / shutdown: it is the only moment the "which tabs were
+    actually open" set still exists.
+
+.PARAMETER Auto
+    Unattended -Snapshot, for a SessionStart hook. Prints NOTHING (a hook's
+    stdout is injected into every session's context), and refuses to replace a
+    snapshot younger than -StaleHours with a SMALLER capture — otherwise
+    restoring N tabs fires the hook on tab #1 and overwrites the N-session
+    record with a 1-session one, stranding the rest.
+
+.PARAMETER FromSnapshot
+    Resume exactly the sessions recorded by -Snapshot. Sessions that are already
+    live again are skipped (so running it twice does not duplicate tabs), as are
+    ones whose working directory has since disappeared.
+
+.PARAMETER SnapshotPath
+    Where -Snapshot writes and -FromSnapshot reads.
+    Default: ~/.claude/aither-resume-snapshot.json
+
+.PARAMETER StaleHours
+    When -FromSnapshot finds no snapshot, it falls back to Claude's own state
+    files for processes that no longer exist (what died in the crash/reboot).
+    Only files touched within this many hours count. Default 12.
+
+.PARAMETER ExcludeEntrypoint
+    Regex of Claude Code `entrypoint` values that are NOT terminal tabs and so
+    must never enter a snapshot. Default '^(sdk|api)'. A headless `claude -p`
+    run reports kind="interactive" like a real session and is distinguishable
+    only here (it is entrypoint "sdk-cli") — without this, a reboot restore
+    reopens throwaway one-shots as tabs. Kept as a DENYLIST so an unfamiliar
+    entrypoint is still captured: over-capturing costs a skipped resume,
+    under-capturing loses work.
+
+.PARAMETER IncludeLive
+    Include sessions that are open in another window right now. By default they
+    are shown but excluded from -All / -Snapshot restores, because resuming a
+    live session opens a SECOND view of the same conversation.
+
 .PARAMETER IncludeMissing
     Include sessions whose working directory no longer exists (skipped by default).
 
@@ -81,6 +122,11 @@
 .EXAMPLE
     pwsh -File Resume-ClaudeSessions.ps1
     Interactive picker of recent sessions; resume the ones you choose as WT tabs.
+
+.EXAMPLE
+    pwsh -File Resume-ClaudeSessions.ps1 -Snapshot        # before you reboot
+    pwsh -File Resume-ClaudeSessions.ps1 -FromSnapshot    # after you reboot
+    Reopen exactly the sessions that were open, nothing else.
 
 .EXAMPLE
     pwsh -File Resume-ClaudeSessions.ps1 -PerDir -All
@@ -105,6 +151,13 @@ param(
     [switch]$SeparateWindows,
     [switch]$Tmux,
     [string]$TmuxSession = 'claude',
+    [switch]$Snapshot,
+    [switch]$Auto,
+    [switch]$FromSnapshot,
+    [string]$SnapshotPath = (Join-Path $HOME '.claude/aither-resume-snapshot.json'),
+    [double]$StaleHours = 12,
+    [string]$ExcludeEntrypoint = '^(sdk|api)',
+    [switch]$IncludeLive,
     [switch]$IncludeMissing,
     [string]$ExcludeSession,
     [switch]$DryRun
@@ -116,6 +169,116 @@ $ErrorActionPreference = 'Stop'
 $script:UseColor = -not $Json -and -not [Console]::IsOutputRedirected
 function C([string]$code, [string]$text) {
     if ($script:UseColor) { "$([char]27)[${code}m$text$([char]27)[0m" } else { $text }
+}
+
+function Get-LiveClaudeSessions {
+    <# Sessions that are OPEN RIGHT NOW, keyed by session id.
+
+       Claude Code (>=2.1.x) writes one state file per running process at
+       ~/.claude/sessions/<pid>.json carrying {pid, sessionId, cwd, name, kind,
+       status, procStart}. That is ground truth, and it replaces the old
+       "journal was written in the last 3 minutes" guess — which was wrong in
+       BOTH directions: an idle-but-open tab writes nothing (looked dead, got
+       resumed twice), and a session killed 30s ago looked live (got skipped,
+       which is exactly the session a post-reboot restore must reopen).
+
+       The files are NOT self-cleaning: one left by a crashed/rebooted process
+       still names a dead pid, so liveness is only claimed when the process is
+       actually there.
+
+       Identity is proven by procStart — the process's local StartTime.Ticks
+       (verified live 2026-07-26, delta 7 ticks) — NOT by the process NAME.
+       Gating on `Get-Process -Name claude` was a Windows-only assumption
+       (D-1327): anywhere Claude Code runs under `node` or a wrapper, that
+       lookup returns nothing, every session reads as dead, `-Snapshot` finds
+       "no live sessions", and the anti-shrink guard then preserves a stale
+       snapshot — silently capturing NOTHING while looking healthy. A pid+start
+       match is stronger evidence than a name anyway: it is exactly what
+       distinguishes the original process from an unrelated one the OS handed
+       the same pid. #>
+    param([string]$SessionsDir = (Join-Path $HOME '.claude/sessions'))
+
+    $live = @{}
+    if (-not (Test-Path -LiteralPath $SessionsDir)) { return $live }
+
+    foreach ($f in @(Get-ChildItem -LiteralPath $SessionsDir -Filter '*.json' -File -ErrorAction SilentlyContinue)) {
+        try { $o = Get-Content -LiteralPath $f.FullName -Raw -ErrorAction Stop | ConvertFrom-Json } catch { continue }
+        if (-not $o.sessionId -or -not $o.pid) { continue }
+        $procId = [int]$o.pid
+
+        # Targeted lookup by id — name-agnostic, and cheaper than enumerating
+        # every process on the box once per state file.
+        $p = Get-Process -Id $procId -ErrorAction SilentlyContinue
+        if (-not $p) { continue }                                  # stale file, process gone
+
+        $st = $null
+        try { $st = $p.StartTime } catch { }   # access denied on a foreign-user proc
+
+        $ticks = [int64]0
+        $haveClaim = $o.procStart -and [int64]::TryParse([string]$o.procStart, [ref]$ticks)
+        if ($haveClaim -and $st) {
+            # 10s tolerance: same process, not a pid the OS handed to someone else.
+            if ([Math]::Abs($ticks - $st.Ticks) -gt 100000000L) { continue }
+        }
+        elseif ($p.ProcessName -notmatch '(?i)claude|node') {
+            # No usable start-time evidence (older state file, or StartTime not
+            # readable). Fall back to the weaker name signal rather than trusting
+            # a bare pid — a recycled pid on an unrelated process would otherwise
+            # resurrect a dead session and, worse, mark it "live" so a restore
+            # SKIPS it.
+            continue
+        }
+
+        $live[[string]$o.sessionId] = [pscustomobject]@{
+            Pid        = $procId
+            Cwd        = [string]$o.cwd
+            Name       = [string]$o.name
+            Kind       = [string]$o.kind
+            Entrypoint = [string]$o.entrypoint
+            Status     = [string]$o.status
+        }
+    }
+    $live
+}
+
+function Get-StaleClaudeSessions {
+    <# The mirror image of Get-LiveClaudeSessions: state files whose process is
+       GONE. After a reboot or a crash that is precisely the set that was open
+       when the machine went down, so it is the fallback record when nobody
+       remembered to run -Snapshot first.
+
+       Claude Code does not appear to prune these on start, but that is an
+       observation, not a contract — which is why it is a FALLBACK and -Snapshot
+       remains the record of intent. Bounded by -StaleHours because the files
+       also accumulate from every session closed normally during the day; without
+       the bound a restore would reopen a week of dead conversations. #>
+    param(
+        [string]$SessionsDir = (Join-Path $HOME '.claude/sessions'),
+        [double]$MaxAgeHours = 12,
+        [string]$ExcludeEntrypoint = '^(sdk|api)'
+    )
+    $out = @{}
+    if (-not (Test-Path -LiteralPath $SessionsDir)) { return $out }
+
+    $cut = (Get-Date).AddHours(-$MaxAgeHours)
+
+    foreach ($f in @(Get-ChildItem -LiteralPath $SessionsDir -Filter '*.json' -File -ErrorAction SilentlyContinue)) {
+        try { $o = Get-Content -LiteralPath $f.FullName -Raw -ErrorAction Stop | ConvertFrom-Json } catch { continue }
+        if (-not $o.sessionId -or -not $o.pid) { continue }
+        # Name-agnostic, same reasoning as Get-LiveClaudeSessions (D-1327): a pid
+        # that still resolves means the process is running, whatever it is called.
+        if (Get-Process -Id ([int]$o.pid) -ErrorAction SilentlyContinue) { continue }  # still running: not stale
+        if ($o.kind -and $o.kind -ne 'interactive') { continue }
+        if ($o.entrypoint -match $ExcludeEntrypoint) { continue }   # headless one-shot, not a tab to reopen
+        if ($f.LastWriteTime -lt $cut) { continue }
+        $out[[string]$o.sessionId] = [pscustomobject]@{
+            Pid  = [int]$o.pid
+            Cwd  = [string]$o.cwd
+            Name = [string]$o.name
+            When = $f.LastWriteTime
+        }
+    }
+    $out
 }
 
 function Get-ClaudeSessionMeta {
@@ -261,6 +424,143 @@ function Expand-Selection {
     $out | Where-Object { $_ -ge 1 -and $_ -le $Count } | Select-Object -Unique
 }
 
+# --- Live sessions (ground truth, see Get-LiveClaudeSessions) ---------------
+$liveMap = Get-LiveClaudeSessions
+
+# --- Snapshot: capture what is open, before it stops being knowable ---------
+if ($Snapshot) {
+    # `kind` alone is NOT enough: a headless `claude -p` / SDK run also registers
+    # itself as kind="interactive" (captured live 2026-07-26) and would land in the
+    # restore set — so a reboot would reopen a throwaway one-shot as a terminal tab.
+    # The honest discriminator is `entrypoint`: a real terminal session is "cli",
+    # a driven one is "sdk-cli". Excluded as a DENYLIST (^sdk) rather than an
+    # allowlist of "cli", so an unfamiliar entrypoint (an IDE host, a future
+    # value) is still captured — over-capturing is cheap here, since restore skips
+    # anything already open, while a missed session is silently lost work.
+    $open = @($liveMap.GetEnumerator() |
+        Where-Object { $_.Value.Kind -eq 'interactive' -and $_.Value.Cwd -and $_.Value.Entrypoint -notmatch $ExcludeEntrypoint } |
+        Sort-Object { $_.Value.Name })
+
+    if ($open.Count -eq 0) {
+        # Do NOT overwrite a good snapshot with an empty one — the usual cause is
+        # running this after the terminals are already gone, and clobbering would
+        # destroy the very record being asked for.
+        Write-Host ''
+        Write-Host (C '1;33' '  No live Claude sessions found — snapshot NOT written.')
+        Write-Host (C '90'   "  (existing snapshot, if any, is left untouched: $SnapshotPath)")
+        Write-Host ''
+        exit 0
+    }
+
+    # -Auto: unattended capture (a SessionStart hook). It must never SHRINK a
+    # recent snapshot. The failure it exists to prevent: restoring 13 tabs fires
+    # the hook on tab #1, which would otherwise overwrite the 13-session record
+    # with a 1-session one and strand the other 12 — losing the exact thing the
+    # snapshot was taken to protect, at the exact moment it is being used.
+    # A deliberate shrink (you closed sessions) is picked up once the record ages
+    # past -StaleHours, or immediately with a plain -Snapshot. Over-capturing is
+    # cheap: restore skips sessions that are already open.
+    if ($Auto -and (Test-Path -LiteralPath $SnapshotPath)) {
+        $prev = $null
+        try { $prev = Get-Content -LiteralPath $SnapshotPath -Raw | ConvertFrom-Json } catch { }
+        if ($prev) {
+            $prevAt = [datetime]::MinValue
+            $fresh  = $true
+            if ([datetime]::TryParse([string]$prev.capturedAt, [ref]$prevAt)) {
+                $fresh = ((Get-Date) - $prevAt).TotalHours -lt $StaleHours
+            }
+            if ($fresh -and [int]$prev.count -gt $open.Count) { exit 0 }
+        }
+    }
+
+    $payload = [pscustomobject]@{
+        capturedAt = (Get-Date).ToString('o')
+        host       = [Environment]::MachineName
+        count      = $open.Count
+        sessions   = @($open | ForEach-Object {
+            [pscustomobject]@{
+                id     = $_.Key
+                name   = $_.Value.Name
+                cwd    = $_.Value.Cwd
+                pid    = $_.Value.Pid
+                status = $_.Value.Status
+            }
+        })
+    }
+
+    $dir = Split-Path -Parent $SnapshotPath
+    if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    $payload | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $SnapshotPath -Encoding utf8
+
+    # -Auto runs from a SessionStart hook, and a hook's stdout is injected into the
+    # session's context. Anything printed here would be paid for in every session,
+    # forever, to say nothing useful. Silence is the feature.
+    if ($Auto) { exit 0 }
+
+    Write-Host ''
+    Write-Host (C '1;32' "  Snapshotted $($open.Count) open session(s) → $SnapshotPath")
+    foreach ($e in $open) {
+        Write-Host ("    • " + (C '1;37' $e.Value.Name) + (C '90' "  ($($e.Value.Cwd))"))
+    }
+    Write-Host ''
+    Write-Host (C '1;36' '  After the reboot:  pwsh -File <this script> -FromSnapshot')
+    Write-Host ''
+    exit 0
+}
+
+# --- Restore: resume exactly the snapshotted set ----------------------------
+if ($FromSnapshot) {
+    $snap = $null
+    if (Test-Path -LiteralPath $SnapshotPath) {
+        try { $snap = Get-Content -LiteralPath $SnapshotPath -Raw | ConvertFrom-Json } catch {
+            Write-Error "Snapshot at $SnapshotPath is not readable JSON: $_"
+            exit 4
+        }
+    }
+
+    if ($snap) {
+        $ids = @($snap.sessions | Where-Object { $_.id } | ForEach-Object { [string]$_.id })
+        $origin = "snapshot taken $($snap.capturedAt)"
+    }
+    else {
+        # No snapshot: fall back to Claude's own state files for processes that are
+        # gone — the machine's own record of what died. Better than telling someone
+        # who just rebooted that their work is unrecoverable.
+        $stale = Get-StaleClaudeSessions -MaxAgeHours ([Math]::Max($StaleHours, 1))
+        $ids = @($stale.Keys)
+        $origin = "orphaned session files (<${StaleHours}h) — no snapshot at $SnapshotPath"
+        if ($ids.Count -gt 0) {
+            Write-Host ''
+            Write-Host (C '1;33' "  No snapshot found — recovering from Claude's own orphaned session files.")
+            Write-Host (C '90'   '  Take one next time with -Snapshot; it records intent, this only guesses.')
+        }
+    }
+
+    if ($ids.Count -eq 0) {
+        Write-Host ''
+        Write-Host (C '1;33' "  Nothing to restore ($origin).")
+        Write-Host ''
+        exit 0
+    }
+
+    # Already back? Skip it. Restoring twice would otherwise open a second tab on
+    # the same conversation — the single most likely way this gets misused.
+    $already = @($ids | Where-Object { $liveMap.ContainsKey($_) })
+    if ($already.Count -gt 0 -and -not $IncludeLive) {
+        $ids = @($ids | Where-Object { -not $liveMap.ContainsKey($_) })
+        Write-Host ''
+        Write-Host (C '1;33' "  $($already.Count) snapshotted session(s) are already open — skipping them.")
+    }
+    if ($ids.Count -eq 0) {
+        Write-Host (C '1;32' '  Everything in the snapshot is already open. Nothing to do.')
+        Write-Host ''
+        exit 0
+    }
+    Write-Host ''
+    Write-Host (C '90' "  Restoring $($ids.Count) session(s) from $origin")
+    $SelectId = ($ids -join ',')
+}
+
 # --- Gather candidates ------------------------------------------------------
 if (-not (Test-Path -LiteralPath $ProjectsRoot)) {
     Write-Error "Claude projects root not found: $ProjectsRoot"
@@ -383,6 +683,14 @@ if ($sessions.Count -eq 0) {
     exit 0
 }
 
+# Annotate with real liveness so neither a human nor an agent has to infer it
+# from the age column (they inferred it wrong — see Get-LiveClaudeSessions).
+foreach ($s in $sessions) {
+    $l = if ($liveMap.ContainsKey($s.Id)) { $liveMap[$s.Id] } else { $null }
+    $s | Add-Member -NotePropertyName Live     -NotePropertyValue ([bool]$l)                              -Force
+    $s | Add-Member -NotePropertyName LiveName -NotePropertyValue $(if ($l) { $l.Name } else { $null })   -Force
+}
+
 # --- JSON mode (for /resume-all and tooling) --------------------------------
 if ($Json) {
     $i = 0
@@ -397,6 +705,8 @@ if ($Json) {
             lastPrompt = $_.LastPrompt
             when       = if ($_.When) { $_.When.ToString('o') } else { $null }
             age        = (Format-Age $_.When).Trim()
+            live       = $_.Live       # open in another window RIGHT NOW — resuming duplicates it
+            name       = $_.LiveName   # Claude's own name for the live process, e.g. aitheros-fresh-68
         }
     } | ConvertTo-Json -Depth 4
     exit 0
@@ -416,7 +726,8 @@ function Show-Table {
         if ($title.Length -gt 34) { $title = $title.Substring(0, 33) + '…' }
         $title  = '{0,-34}' -f $title
         $branch = if ($s.Branch) { " ($($s.Branch))" } else { '' }
-        Write-Host ("  " + (C '1;33' $n) + "  " + (C '90' $age) + "  " + (C '1;37' $title) + (C '36' $branch))
+        $liveTag = if ($s.Live) { (C '1;35' '  ⚡ live') } else { '' }
+        Write-Host ("  " + (C '1;33' $n) + "  " + (C '90' $age) + "  " + (C '1;37' $title) + (C '36' $branch) + $liveTag)
         Write-Host ("        " + (C '90' $s.Cwd))
         if ($s.LastPrompt) {
             $lp = ($s.LastPrompt -replace '\s+', ' ').Trim()
@@ -441,8 +752,15 @@ if ($selectedById) {
     $chosen = $selectedById
 }
 elseif ($All) {
-    $chosenIdx = 1..$sessions.Count
     Show-Table
+    # "all" means "everything that is NOT already on screen somewhere". Resuming a
+    # live session opens a second view of one conversation, which is never what
+    # a bulk resume meant.
+    $chosenIdx = @(1..$sessions.Count | Where-Object { $IncludeLive -or -not $sessions[$_ - 1].Live })
+    $skipped = $sessions.Count - $chosenIdx.Count
+    if ($skipped -gt 0) {
+        Write-Host (C '1;33' "  Skipping $skipped session(s) already open (-IncludeLive to resume them anyway).")
+    }
 } elseif ($Select) {
     $chosenIdx = Expand-Selection -Spec $Select -Count $sessions.Count
     Show-Table

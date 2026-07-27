@@ -1,6 +1,6 @@
 ---
-description: Reopen your killed Claude Code sessions — pick from every project, resume as terminal tabs or tmux windows
-argument-hint: "[all | 1,3,5 | <filter text>]  (empty = pick interactively)"
+description: Reopen your killed Claude Code sessions — snapshot before a reboot, restore after, or pick from every project and resume as terminal tabs or tmux windows
+argument-hint: "[snapshot | restore | all | 1,3,5 | <filter text>]  (empty = pick interactively)"
 allowed-tools: Bash(pwsh:*)
 ---
 
@@ -12,7 +12,52 @@ session history — it never mutates the journals.
 
 Arguments the user passed: `$ARGUMENTS`
 
-Do this:
+## Around a reboot: snapshot → restore
+
+The set of sessions that were actually OPEN only exists while they are running.
+Capture it while you still can, then reopen exactly that set:
+
+```
+pwsh -NoProfile -File "<ENGINE>" -Snapshot       # before shutting down
+pwsh -NoProfile -File "<ENGINE>" -FromSnapshot   # after booting back up
+```
+
+Restore skips sessions that are already open, so it is safe to run twice. If
+`$ARGUMENTS` is `snapshot` or `restore`, run the matching command, report the
+result, and stop — no listing needed.
+
+To keep the snapshot fresh without remembering to run it, wire `-Snapshot -Auto`
+into a SessionStart hook in `settings.json` — it prints nothing (a hook's stdout
+is charged to every session's context) and refuses to replace a snapshot younger
+than `-StaleHours` with a SMALLER capture. That guard is not optional: without it,
+restoring 13 tabs fires the hook on tab #1 and overwrites the 13-session record
+with a 1-session one, stranding the other 12 at the exact moment the snapshot is
+being used.
+
+Verify a hook by making it PROVE it fired, not by reading the config back: plant
+a deliberately tiny snapshot, start a session, and check the snapshot regrew.
+That is what caught the next bug — a headless `claude -p` run reports
+`kind:"interactive"` and was being captured, so a reboot would have reopened
+throwaway one-shots as tabs. `entrypoint` is the real discriminator (`cli` vs
+`sdk-cli`); the engine excludes `^sdk` by denylist so unknown entrypoints are
+still captured.
+
+```json
+"hooks": { "SessionStart": [ { "hooks": [ {
+  "type": "command",
+  "command": "pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"<ENGINE>\" -Snapshot -Auto",
+  "timeout": 20
+} ] } ] }
+```
+
+If no snapshot exists, `-FromSnapshot` falls back to Claude's own per-process
+state files (`~/.claude/sessions/<pid>.json`) left behind by processes that are
+gone. That covers a **hard crash / power loss**; it does NOT cover a clean
+reboot, because Claude Code deletes its state file when a session exits normally
+(verified 2026-07-26). So: take the snapshot. The fallback is insurance, not a
+substitute.
+
+## Otherwise: list, choose, launch
 
 1. List resumable sessions as JSON:
 
@@ -30,11 +75,14 @@ Do this:
      numbers to resume. Wait for their answer.
    - **`all`** → resume every listed session.
 
-   Liveness check first, whatever the argument: a session whose `when` is within
-   the last ~3 minutes is probably LIVE in another window right now — its journal
-   is still being written. Resuming it spawns a DUPLICATE. Mark those
-   `⚡ likely live — skipped`, exclude them from `all`, and only resume one if the
-   user names it explicitly.
+   Liveness comes from the engine, not from you: every entry carries
+   `live: true/false`, resolved from Claude Code's own per-process state files
+   (`~/.claude/sessions/<pid>.json`) with the pid validated. Resuming a live
+   session opens a SECOND view of one conversation — mark those `⚡ live — skipped`,
+   exclude them from `all`, and resume one only if the user names it explicitly.
+   Do NOT infer liveness from the age column: measured 2026-07-26, a `3m ago`
+   session was live and a `4m ago` one was dead, so any age cutoff is inside the
+   noise. `-IncludeLive` overrides deliberately.
    - **a list like `1,3,5-7`** → resume those indices.
    - **anything else** → treat it as a `-Filter` substring; re-run step 1 adding
      `-Filter "<text>"`, then confirm the matches with the user.
