@@ -1,14 +1,44 @@
 # aither-skills
 
-**Free, MIT-licensed agent skills, scripts, and automations** — the unglamorous glue that makes agent-run infrastructure actually work.
+**Learn to run coding agents at program scale — from measured telemetry, not vibes.**
+Free, MIT-licensed. The operating doctrine, plus 40+ battle-tested skills.
 
-Built and battle-tested inside [AitherOS](https://aitherium.com) (an AI-native operating system), pulled out here so anyone can use them. Recovery routines, deploy helpers, secret-safety scanners — small, sharp, reusable.
+Most advice about working with AI coding agents is somebody's feeling. This repo is one
+operator's logs: **27,939 prompts across 3,183 sessions over 210 days**, re-measured on a
+disjoint 34-day window (5,244 human prompts, 9,715 machine-written agent dispatches), then
+distilled into rules you can install into your own setup in about ten minutes.
 
-> Why this exists: agents operating real infrastructure need the infrastructure to be **self-healing and one-command operable**. If standing your environment back up is a 10-step wiki page, an autonomous agent can't recover from a bad state. These are the one-command versions.
+Everything here came out of running a real platform — 260 services, ~166 containers, three
+repos — with agents doing most of the typing. The skills are the parts that survived.
 
 ---
 
-## 🚀 Start here — you don't need to know how to code
+## 🧠 Start here — code like this
+
+| Skill | What it teaches |
+|---|---|
+| [`code-like-david`](skills/code-like-david.md) | **The doctrine.** 13 measured rules for running an agent at program scale: prompt shape, live-proof gates, plan documents as files not modes, persistent memory with an index, when to orchestrate vs stay solo, when to compact, how to route models. Installs itself into your rules/memory/plans directories without overwriting anything. |
+| [`ramble-driven-development`](skills/ramble-driven-development.md) | **The prompt-shape law.** Median human prompt: **56 characters**. But the 5.9% over 1,000 chars carry **78% of everything typed**. Ramble to load intent, poke to steer, and put the precision in the harness — 90% of machine-written dispatches name a file path against 6% of human ones. Includes how to mine *your* transcripts, and the two filters that otherwise inflate your median by 33x. |
+
+```bash
+git clone https://github.com/Aitherium/aither-skills
+cd aither-skills
+bash scripts/install-aither-skills.sh          # Windows: pwsh -File scripts/Install-AitherSkills.ps1
+```
+
+Then tell your agent: **"use the code-like-david skill"**.
+
+> **The one rule to take away if you read nothing else:** the careful, fully-specified
+> prompt still has to exist — you just shouldn't be the one typing it. Put your standards
+> in a rules file once, add a gate that can fail, and your prompts collapse to
+> "get it done." **You don't type your standards. You install them.**
+>
+> ⚠️ Doing this on a bare setup with no gates produces confident garbage at speed. Build
+> the gate first. Both skills say so up front.
+
+---
+
+## 🚀 Then — run the agent on your own hardware, free
 
 If you have a computer and access to an AI agent, you can run your own agent on your own
 hardware, for free, today. Install the pack and open the front door:
@@ -26,8 +56,11 @@ Then tell your agent: **"use the aither-start skill"**.
 | [`aither-start`](skills/aither-start.md) | **The front door.** Zero → working agent on your own machine: detect the hardware, install the toolkit, run a model that actually fits, wire it into the agent you already use. Every step ends in a check that can fail. |
 | [`local-inference`](skills/local-inference.md) | A language model on your box for **$0** — pick Ollama / llama.cpp / vLLM for the machine you *have*, size the model so it doesn't OOM, serve it OpenAI-compatible, prove it with a real round-trip. Includes tool-calling setup and the failure modes that look like success. |
 | [`install-skills`](skills/install-skills.md) | Install this pack into **any** agent — Claude Code, OpenClaw, Hermes, Cursor, Goose, Codex, Gemini CLI. Explains the two layouts (`SKILL.md` folder vs flat slash-command) and why the wrong one makes an agent "not see" skills that are right there. |
+| [`repo-is-not-a-runtime`](skills/repo-is-not-a-runtime.md) | **The doctrine underneath the cleanup.** Two rules: a repo is a *source artifact*, not a runtime; and every ephemeral an agent creates needs an owner, a TTL and a **reaper**. Measured: a checkout that was **0.4% `.git`** and 99.6% runtime data + agent debris. Ships [`repo-hygiene-audit.sh`](tools/repo-hygiene-audit.sh) — a gate that *fails*, because doctrine without a gate is a wish. |
+| [`agent-disk-hygiene`](skills/agent-disk-hygiene.md) | **Your agents are quietly eating your disk.** A real checkout grew to **1.15 TB** — of which `.git` was **4.7 GB**; the rest was agent debris, led by **295 GB of abandoned worktrees**. How to reap them safely, and the `git log --branches` trap that makes every worktree look dirty forever so nothing ever gets cleaned. Ships [`agent-worktree-reaper.sh`](tools/agent-worktree-reaper.sh). |
 | [`docker-wsl2-disk-reclaim`](skills/docker-wsl2-disk-reclaim.md) | Your drive is full, you pruned 200GB, and nothing changed. Docker Desktop's VHDX **never shrinks** — its data disk is mounted without `discard`. The three-layer accounting model (VHDX 2.0TB ≥ ext4 1.6TB ≥ `docker system df` 634GB), why `fstrim` before compaction is mandatory, and why moving the file to another drive doesn't help. Ships [`docker-wsl2-reclaim.sh`](tools/docker-wsl2-reclaim.sh). |
 | [`docker-wsl2-build-safety`](skills/docker-wsl2-build-safety.md) | Stop bulk image builds from crashing Docker Desktop's WSL2 backend and taking every container down — plus the day-distribution check that tells a **VM storage collapse** apart from a **failing disk**. They look identical: 44k disk I/O errors in an hour, `Device offlined`, "Docker Desktop is unable to start". One is a config problem; the other is a hardware purchase. |
+| [`docker-network-ops`](skills/docker-network-ops.md) | **Container DNS lies to you.** Docker's embedded resolver `127.0.0.11` is a goroutine inside `dockerd`, not a kernel service — measured **failing 38–65% of queries with clean 2s timeouts, sustained**, while conntrack sat at 11% and `Udp InErrors=0`. Why no kernel counter will ever show it, why musl/glibc/nginx each fail differently in the *same* container, the silent `--bind-interfaces` race that leaves dnsmasq `Up (healthy)` serving nothing, and the six measurement traps that each produced a confident wrong answer. Ships [`docker-net-doctor.py`](tools/docker-net-doctor.py). |
 | [`openclaw`](skills/openclaw.md) | Install [OpenClaw](https://github.com/openclaw/openclaw), point it at *your* model instead of a paid API, and connect the AitherOS toolset with one command (`aither integrate openclaw`). |
 | [`hermes-agent`](skills/hermes-agent.md) | Install [Nous Research's Hermes](https://github.com/nousresearch/hermes-agent) — self-improving, persistent memory, cron automation — on your own inference. Includes the two config shapes that **silently do nothing** if you get them wrong. |
 | [`tau`](skills/tau.md) | Install [Tau](https://github.com/wizzense/tau) — a minimalist Python terminal coding agent — on your own model via `~/.tau/catalog.toml`. Includes the folder-only skill layout tau enforces (bare `.md` is silently skipped) and the `/skill:name` invocation. |
