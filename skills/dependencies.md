@@ -150,12 +150,25 @@ pip-audit
 # Alternative: Safety check
 safety check
 
-# Update safely with constraints
-pip install --upgrade -r requirements.txt --constraint constraints.txt
+# Update safely
+pip install --upgrade -r requirements.txt
+
+# Pin transitive versions without editing requirements.txt
+# (a constraints file only CAPS versions; it never installs anything itself)
+pip install -r requirements.txt -c constraints.txt
 
 # Generate lock file
 pip freeze > requirements-lock.txt
 ```
+
+> **A constraints file only works if something actually passes `-c`.** Copying one next
+> to your requirements does nothing; neither does mentioning it in a comment. We found a
+> `constraints.txt` in our own repo that was faithfully copied into every container image
+> and then deleted at the end of the build — never once passed to `pip`. Its header
+> promised that certain packages "must NEVER be downgraded", while the build on the line
+> above deliberately installed the very thing it forbade. Grep for `-c` or `--constraint`
+> in your Dockerfiles and CI before trusting one: an unenforced pin is worse than no pin,
+> because everyone reads it and believes they are protected.
 
 ### Node.js Dependencies
 ```bash
