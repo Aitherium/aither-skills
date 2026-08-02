@@ -83,6 +83,30 @@ every "returns nothing" assertion while being completely inert. Every feature ne
 positive assertion that the happy path really produces data.
 **Evidence:** every phase gate in 231 plan documents is a live check, never "tests pass".
 
+### 2b. A missing tool is a SILENCE — enumerate your MCP config, never assume one file
+
+**When:** your agent seems to have lost its tools, or is quietly doing everything the long
+way. **What:** an absent tool raises no error, logs nothing, and fails no call — it is
+indistinguishable from a session that never needed one. You cannot notice a tool you were
+never offered, so this needs a check, not vigilance.
+
+Two things make it worse than it sounds:
+
+- **A project can hold more than one `.mcp.json`, and the one NEAREST your working
+  directory wins.** A perfectly correct config at the repo root proves nothing if a nested
+  one shadows it. Enumerate every config in the tree before concluding anything.
+- **Use `127.0.0.1`, never `localhost`.** `localhost` resolves `::1` first. Measured on a
+  Windows/WSL2 box: `::1:8182` refused after **2120 ms** where `127.0.0.1:8182` connected
+  in **3 ms** — a ~2 s tax on every connection, and a hard failure for any client that
+  doesn't walk to the next address.
+
+And check the **generator**, not just the file: if a setup script writes that config, a
+hand-fix to its output silently reverts the next time the script runs. Fix the emitter.
+
+**Evidence:** a session ran with zero platform tools while the gateway was `Up (healthy)`,
+its `/health` returned 200, and an authenticated probe listed 1211 tools. Every cheap
+signal was green; the config that was wrong was not the config anyone thinks to read.
+
 ## 3. Root cause over workaround
 
 **When:** a fallback or disable-it-for-now is proposed. **What:** refuse by default; fix
