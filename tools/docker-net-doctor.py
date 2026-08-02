@@ -44,6 +44,7 @@ pass - a check that cannot run tells you nothing).
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -55,7 +56,12 @@ _findings: list[tuple[str, str]] = []
 
 def _run(args: list[str], timeout: int = 60) -> tuple[int, str]:
     try:
-        p = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        # encoding= is required: without it the child's output is decoded with the
+        # LOCALE codec (cp1252 on Windows hosts), and a UnicodeDecodeError is a
+        # ValueError -- which the except below does catch, but only by turning a
+        # readable probe result into the string form of a decode error.
+        p = subprocess.run(args, capture_output=True, text=True, timeout=timeout,
+                           encoding="utf-8", errors="replace")
         return p.returncode, (p.stdout or "") + (p.stderr or "")
     except Exception as exc:  # noqa: BLE001 - a failed probe must not crash the doctor
         return 1, str(exc)
@@ -82,6 +88,113 @@ def _hostshell(script: str, timeout: int = 90) -> tuple[int, str]:
     )
 
 
+# -- ARP TABLE HEADROOM -------------------------------------------------------
+
+
+def check_arp() -> None:
+    """The global ARP table vs the fleet's total entries.
+
+    THE FAULT THIS FINDS, and why it is worth its own check: Linux keeps ONE
+    GLOBAL `arp_tbl` whose entry count is shared across EVERY network namespace,
+    while `gc_thresh3` -- the ceiling on it -- defaults to 1024. Containers each
+    hold their own ARP entries, so on a large single-bridge fleet their SUM
+    blows past that ceiling; `neigh_alloc` then refuses new entries and
+    whichever container ARPs next simply cannot resolve its next hop.
+
+    It presents as a PER-CONTAINER fault and that is the trap. Measured on a
+    187-container fleet (2026-08-02): one container's `getaddrinfo` failed
+    INSTANTLY with EAI_AGAIN, it held no ARP entry for either resolver, and raw
+    UDP *and* TCP :53 both timed out -- while it was `Up (healthy)`, its
+    resolv.conf was byte-identical to a working container's, and the resolver
+    answered a peer on the same bridge in 12ms.
+
+    A `--force-recreate` "fixed" it every time, which is exactly why the real
+    cause hid for weeks: a recreate CHURNS neighbour entries and frees table
+    space, so the container comes back 0/6 -> 6/6 and the limit refills minutes
+    later. The measured fleet total was ~2000 entries against the 1024 ceiling.
+    Raising the thresholds fixed the container with NO recreate at all, and
+    simultaneously fixed an unrelated container that could not reach the Docker
+    proxy -- one kernel tunable, two "separate" outages.
+
+    Nothing else can see it: every per-container signal is green, the resolver
+    is genuinely healthy, and the only evidence is a kernel ring-buffer line.
+    """
+    print("\n== ARP TABLE HEADROOM (a per-container symptom with a global cause) ==")
+    rc, out = _hostshell(
+        "echo T3=$(cat /proc/sys/net/ipv4/neigh/default/gc_thresh3 2>/dev/null);"
+        "echo UP=$(cut -d' ' -f1 /proc/uptime);"
+        "dmesg 2>/dev/null | grep 'neighbor table overflow' | tail -1"
+    )
+    if rc != 0:
+        _defect("arp", "could not read the host neighbour settings")
+        return
+
+    thresh, uptime, last_overflow = 0, 0.0, None
+    for ln in out.splitlines():
+        if ln.startswith("T3=") and ln[3:].strip().isdigit():
+            thresh = int(ln[3:].strip())
+        elif ln.startswith("UP="):
+            try:
+                uptime = float(ln[3:].strip())
+            except ValueError:
+                # Leave uptime at 0; the freshness test below then declines to
+                # judge rather than silently treating an old event as current.
+                print(f"  [?     ] arp - unparseable uptime {ln[3:].strip()!r}")
+        else:
+            m = re.match(r"\s*\[\s*(\d+\.\d+)\]", ln)
+            if m and "overflow" in ln:
+                last_overflow = float(m.group(1))
+
+    # Overflow within this window means it is happening NOW. dmesg is cumulative
+    # since boot, so a raw count stays non-zero forever after a fix -- and a gate
+    # that can never go green gets switched off rather than satisfied.
+    if last_overflow is not None and uptime and (uptime - last_overflow) <= 900:
+        _defect(
+            "arp:overflow",
+            f"kernel reported neighbour table overflow {uptime - last_overflow:.0f}s "
+            "ago - containers ARE failing to resolve their next hop right now",
+        )
+    elif last_overflow is not None:
+        _ok("arp:overflow", f"last event {uptime - last_overflow:.0f}s ago (stale)")
+    else:
+        _ok("arp:overflow", "none reported")
+
+    if not thresh:
+        # Docker Desktop / WSL2: --net=host lands in the ENGINE's netns, where
+        # neigh/default is not even present. The knob lives in the docker-desktop
+        # distro's init netns instead. Report it, never silently pass.
+        print("  [?     ] arp:thresh - gc_thresh3 unreadable from the engine netns.")
+        print("           Docker Desktop/WSL2: wsl -d docker-desktop -e sh -c \\")
+        print("             'cat /proc/sys/net/ipv4/neigh/default/gc_thresh3'")
+        return
+
+    total, sampled = 0, 0
+    rc, names = _run(["docker", "ps", "--format", "{{.Names}}"], timeout=60)
+    for name in (names.split() if rc == 0 else [])[:80]:
+        rc2, o = _run(
+            ["docker", "exec", name, "sh", "-c",
+             "cat /proc/net/arp 2>/dev/null | tail -n +2 | wc -l"], timeout=20)
+        line = o.strip().splitlines()[-1] if o.strip() else ""
+        if rc2 == 0 and line.isdigit():
+            total += int(line)
+            sampled += 1
+    if not sampled:
+        print("  [?     ] arp:entries - no container was probeable; NOT judged")
+        return
+    running = len(names.split()) if rc == 0 else sampled
+    projected = int(total / sampled * running)
+    if projected > thresh * 0.7:
+        _defect(
+            "arp:headroom",
+            f"~{projected} entries projected across {running} containers vs "
+            f"gc_thresh3={thresh}. They share ONE global table; over the limit a "
+            "random container loses DNS while every container-level signal stays "
+            "green. Raise gc_thresh1/2/3 (e.g. 4096/8192/16384)",
+        )
+    else:
+        _ok("arp:headroom", f"~{projected} entries vs gc_thresh3={thresh}")
+
+
 # -- 1. PRESSURE - check this FIRST -------------------------------------------
 
 def check_pressure() -> None:
@@ -104,7 +217,8 @@ def check_pressure() -> None:
         return
 
     ratio = load15 / cores if cores else 0
-    detail = f"load {load1:.1f}/{load5:.1f}/{load15:.1f} on {cores} cores (15m = {ratio:.0%} of capacity)"
+    detail = (f"load {load1:.1f}/{load5:.1f}/{load15:.1f} on {cores} cores "
+              f"(15m = {ratio:.0%} of capacity)")
     if ratio >= 0.9:
         _defect("pressure:saturated", detail + " - dockerd's resolver will miss client timeouts")
     elif ratio >= 0.6:
@@ -119,7 +233,8 @@ def check_pressure() -> None:
     uncapped: list[str] = []
     for name in [n for n in out.split() if n][:400]:
         rc2, o2 = _run(
-            ["docker", "inspect", name, "--format", "{{.HostConfig.NanoCpus}}|{{.HostConfig.CpuQuota}}"],
+            ["docker", "inspect", name, "--format",
+             "{{.HostConfig.NanoCpus}}|{{.HostConfig.CpuQuota}}"],
             timeout=20,
         )
         if rc2 == 0 and o2.strip().startswith("0|0"):
@@ -164,7 +279,8 @@ def check_kernel() -> None:
         cnt, mx = int(vals.get("C", "0")), int(vals.get("M", "1"))
         pct = cnt / mx if mx else 0
         if pct >= 0.8:
-            _defect("kernel:conntrack", f"{cnt}/{mx} ({pct:.0%}) - table near full, packets WILL drop")
+            _defect("kernel:conntrack",
+                    f"{cnt}/{mx} ({pct:.0%}) - table near full, packets WILL drop")
         else:
             _ok("kernel:conntrack", f"{cnt}/{mx} ({pct:.0%}) - not the cause")
     except ValueError:
@@ -275,7 +391,8 @@ def check_policy(limit: int = 12) -> None:
         print(f"  [{len(names):>3}x] {key}")
         print(f"         e.g. {', '.join(names[:3])}")
     if len(seen) > 1:
-        _defect("policy:divergent", f"{len(seen)} distinct resolver policies in use - expect uneven failures")
+        _defect("policy:divergent",
+                f"{len(seen)} distinct resolver policies in use - expect uneven failures")
 
 
 # -- 6. EGRESS - the container that is Up, healthy, and severed ---------------
@@ -435,6 +552,8 @@ def main() -> int:
         check_pressure()
     if mode in ("all", "kernel"):
         check_kernel()
+    if mode in ("all", "arp"):
+        check_arp()
     if mode in ("all", "binds"):
         check_binds()
     if mode in ("all", "clients"):

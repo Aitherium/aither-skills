@@ -19,6 +19,7 @@ It runs the checks in the order that actually finds the fault, not the order you
 python tools/docker-net-doctor.py            # everything
 python tools/docker-net-doctor.py pressure   # load vs cores + uncapped CPU consumers
 python tools/docker-net-doctor.py kernel     # conntrack + UDP counters (rule OUT the theories)
+python tools/docker-net-doctor.py arp        # GLOBAL ARP table vs the fleet's total entries
 python tools/docker-net-doctor.py binds      # dnsmasq --bind-interfaces race detector
 python tools/docker-net-doctor.py policy     # true resolv.conf per container
 python tools/docker-net-doctor.py clients    # musl vs glibc vs nginx semantics
@@ -212,6 +213,71 @@ The durable defect is the **blindness**, not the veth: a healthcheck that never 
 container passes in exactly this case. Any service with outbound dependencies needs a
 healthcheck that performs a real dependency round-trip.
 
+> **Before you accept "broken veth", read the next section.** On a large fleet the same
+> symptom is far more often the GLOBAL ARP table, and the restart that "fixes the veth" is
+> also what hides it.
+
+## The per-container fault with a global cause: ARP table overflow
+
+```bash
+docker-net-doctor.py arp
+```
+
+Linux keeps **ONE GLOBAL `arp_tbl`** whose entry count is shared across **every network
+namespace**, while `gc_thresh3` — the ceiling on it — defaults to **1024**. Every container
+holds its own ARP entries, so on a large single-bridge fleet their *sum* crosses that
+ceiling, `neigh_alloc` starts refusing new entries, and whichever container ARPs next
+cannot resolve its next hop.
+
+It presents as a **per-container** fault, and that is the whole trap. Measured on a
+187-container fleet (2026-08-02), one container showed:
+
+- `getaddrinfo` failing **instantly** with `EAI_AGAIN` (not slow — instant)
+- **no ARP entry** for either resolver in `/proc/net/arp`
+- raw **UDP *and* TCP** `:53` both timing out
+- `Up (healthy)`, resolv.conf byte-identical to a working container, correct routes and
+  prefix — while the resolver answered a different container on the same bridge in **12ms**
+
+Every per-container signal was green and the resolver plane was genuinely healthy. The only
+evidence was a kernel line nothing reads: **1,991** `neighbour: arp_cache: neighbor table
+overflow!` in 3.4h.
+
+**Why it hid for weeks:** `--force-recreate` fixed it every single time. A recreate *churns
+neighbour entries and frees table space*, so the container returns 0/6 → 6/6, the fix looks
+proven, and the table refills minutes later. One container was repaired to 6/6 and was dark
+again within 15 minutes; a later repair attempt scored **0 → 0**. The measured fleet total
+was **~2000 entries against the 1024 ceiling** — roughly 2× over.
+
+Raising the thresholds fixed that container **with no recreate at all** (its resolver went
+`TimeoutError` → `0ms` in the same shell) and simultaneously fixed an *unrelated* container
+that could not reach the Docker API proxy. One kernel tunable, two "separate" outages.
+
+```bash
+# plain Linux Docker host
+sysctl -w net.ipv4.neigh.default.gc_thresh1=4096
+sysctl -w net.ipv4.neigh.default.gc_thresh2=8192
+sysctl -w net.ipv4.neigh.default.gc_thresh3=16384
+```
+
+**Docker Desktop / WSL2 needs a different door.** A `--privileged --net=host` container
+lands in the *engine's* netns, where `/proc/sys/net/ipv4/neigh/default` **does not exist** —
+so the knob is unreadable and unwritable from there, and `nsenter -t 1` does not reach it
+either. Use the distro's init netns:
+
+```bash
+wsl -d docker-desktop -e sh -c 'sysctl -w net.ipv4.neigh.default.gc_thresh3=16384'
+```
+
+Three things worth stealing from this:
+
+- **Diagnose the fleet, not the container.** When N containers fail the same way one at a
+  time, suspect a shared global limit before N independent per-container faults.
+- **A remedy that works every time but never lasts is evidence about the remedy**, not the
+  fault. "Recreate fixes it" meant the recreate was *relieving pressure*, not repairing.
+- **Count overflow events in a recent window, never cumulatively.** `dmesg` is cumulative
+  since boot, so a raw count stays non-zero forever after a fix — and a check that can never
+  go green gets switched off rather than satisfied.
+
 ## Application layer — infra alone cannot fix this
 
 **`EAI_AGAIN` is POSIX for "temporary failure — try again."** Treating it as a hard outage
@@ -234,3 +300,7 @@ When retrying DNS failures:
 4. Policy verified from **inside** a container, with the client the failing app uses.
 5. Every source tree updated if the file is mounted from more than one.
 6. The consuming application retries `EAI_AGAIN` instead of surfacing it.
+7. **The global ARP table has headroom** — `gc_thresh3` comfortably above the fleet's total
+   entries, and no `neighbor table overflow` in a recent window. Skip this and a
+   many-container fleet keeps losing one container at a time, forever, to a fault that
+   every per-container probe reports as healthy.
