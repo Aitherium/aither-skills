@@ -25,7 +25,7 @@ The landing page must reflect what the project actually is — name, one-line pi
 install command, a real usage example — not a generic template. Pick the mode:
 - **default**: generate a landing page (below) + rendered README.
 - `--docs`: publish the existing `docs/` folder (mkdocs/jekyll if configured).
-- `--spa <dir>`: publish an existing build output (add the Actions workflow to build it).
+- `--spa <dir>`: publish an existing build output (add the Actions workflow to build it). **If your app uses client-side routing** (React Router, Vue Router, etc.), the workflow must also run `touch <dir>/.nojekyll && cp <dir>/index.html <dir>/404.html` after the build so non-root routes fall back to index.html instead of 404.
 - `--plain`: no generation — just enable Pages off the README with a clean Jekyll theme
   (`_config.yml` with `theme: jekyll-theme-cayman` + title/description). The 60-second path.
 

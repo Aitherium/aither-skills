@@ -44,7 +44,7 @@ and `git push` to it.
 ### 2. Turn Pages on
 
 ```bash
-gh api -X POST repos/:owner/my-app/pages -f build_type=workflow
+gh api -X POST repos/{owner}/my-app/pages -f build_type=workflow
 ```
 
 Or in the web UI: **Settings → Pages → Source: GitHub Actions**.
@@ -104,14 +104,14 @@ For a framework app (React/Vite/Next static export), build first and upload the 
 ```bash
 git add -A && git commit -m "add deploy workflow" && git push
 gh run watch                                    # follow the build
-gh api repos/:owner/my-app/pages --jq .html_url # your live URL
+gh api repos/{owner}/my-app/pages --jq .html_url # your live URL
 ```
 
 **Verify it serves YOUR app, not a 404 page:**
 
 ```bash
-curl -sSL -o /dev/null -w "%{http_code}\n" "$(gh api repos/:owner/my-app/pages --jq .html_url)"
-curl -sSL "$(gh api repos/:owner/my-app/pages --jq .html_url)" | head -20
+curl -sSL -o /dev/null -w "%{http_code}\n" "$(gh api repos/{owner}/my-app/pages --jq .html_url)"
+curl -sSL "$(gh api repos/{owner}/my-app/pages --jq .html_url)" | head -20
 ```
 
 A `200` alone is not proof — GitHub's 404 page is itself served with a 200 in some paths.
@@ -125,6 +125,7 @@ A `200` alone is not proof — GitHub's 404 page is itself served with a 200 in 
 | Blank page, console 404s on `/assets/…` | app assumes it's at the domain root; Pages serves at `/repo-name/` | set the base path — Vite: `base: '/my-app/'`; Next: `basePath` |
 | Deploy fails on permissions | missing `permissions:` block | add all three lines |
 | Pushes don't redeploy | workflow watches the wrong branch | match `branches:` to your default branch |
+| 404 on client routes like `/app/dashboard` | SPA client-side routing fallback missing | after build: add `touch out/.nojekyll && cp out/index.html out/404.html` (Vite: `dist/`; CRA: `build/`; Next: `out/`) |
 
 ---
 
