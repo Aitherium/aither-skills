@@ -63,13 +63,28 @@ same tunnel (same credentials) on a second machine — Cloudflare load-balances 
 connectors and fails over automatically when one dies.
 
 ### 4. The automated fallback (unless --no-worker)
-- Copy `scripts/fallback-worker/worker.js` + `wrangler.toml.example` (→ `wrangler.toml`)
-  into a `fallback-worker/` dir in the user's repo.
-- Edit `SERVICE` in worker.js (name, accent, the Pages URL) and put EVERY dynamic hostname
-  in `wrangler.toml` routes. **Teach the rule: a tunnel hostname missing from routes shows
-  a raw Cloudflare error during an outage.** Adding a hostname = tunnel ingress + routes,
-  same commit, every time.
-- `npx wrangler deploy` (OAuth via `wrangler login`).
+- Set up the worker directory:
+  ```bash
+  mkdir fallback-worker
+  cp scripts/fallback-worker/worker.js fallback-worker/
+  cp scripts/fallback-worker/wrangler.toml.example fallback-worker/wrangler.toml
+  ```
+- Edit three fields in `fallback-worker/worker.js` SERVICE config (lines 15–17):
+  - `name`: your service name (shows on the maintenance page)
+  - `accent`: your brand color (e.g., `#5ad1ff`)
+  - `staticFallback`: your GitHub Pages URL (e.g., `https://username.github.io`)
+- In `fallback-worker/wrangler.toml`, replace `example.com` with YOUR domain in BOTH places:
+  - `zone_name`: the Cloudflare zone where your domain is registered
+  - `pattern`: the dynamic hostname(s) you want protected (e.g., `api.yourdomain.com/*`)
+  - Add one route entry per dynamic hostname your tunnel uses.
+
+  **Teach the rule: a tunnel hostname missing from routes shows a raw Cloudflare error during an outage.** Adding a hostname = tunnel ingress + routes, same commit, every time.
+- Authenticate and deploy:
+  ```bash
+  npx wrangler login    # opens browser to authorize access
+  npx wrangler deploy
+  ```
+  Verify: `curl -s https://api.<yourdomain> -I` should reach your backend (or show the maintenance page if it's down).
 
 ### 5. Verify like you mean it
 - `https://<domain>` serves from `server: GitHub.com` (curl -sI).
