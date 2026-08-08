@@ -286,6 +286,7 @@ motion, not five projects.
 | Skill | What it sets up |
 |-------|-----------------|
 | [`aither-adk`](skills/aither-adk.md) | The agent toolkit — `pip install aither-adk` → `adk onboard --quick` → `adk run`. Your model, your loop, your data on your box; manage from the portal. |
+| [`aither-discord-agent`](skills/aither-discord-agent.md) | Deploy any aither-adk agent as a **Discord bot** with one automated onboarding command — `adk onboard --discord` installs your pack, validates the bot token live, prints the invite link, verifies identity/tools, and launches. Every DM/@mention runs your agent's own loop. No paid tier needed (hand-rolled fallback). |
 | [`aithernode`](skills/aithernode.md) | The *body* — a local MCP server (`adk mcp node`) exposing GPU, local inference, ComfyUI, and files to agents; or bootstrap the box as a full inference node. |
 | [`aitherconnect`](skills/aitherconnect.md) | The seam — `adk connect` / `adk mesh onboard` (`--headscale` behind NAT) to wire a machine, agent, and browser into AitherOS and the mesh. |
 | [`aitherzero`](skills/aitherzero.md) | The provisioner — one `config.psd1` + `bootstrap.ps1` to stand up bare-metal/on-prem/cloud/hybrid, with a generated-from-inventory config editor and `az_*` agent tools. |
