@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Recovers Docker Desktop from the WSL2 500-error hang without rebooting.
 .DESCRIPTION

@@ -68,6 +68,7 @@ Then tell your agent: **"use the aither-start skill"**.
 | [`deer-flow`](skills/deer-flow.md) | Run [DeerFlow](https://github.com/bytedance/deer-flow) — ByteDance's LangGraph super-agent harness for long autonomous research/coding runs — on your own endpoint, with MCP servers and per-tool timeouts. |
 | [`ods`](skills/ods.md) | Stand up [ODS](https://github.com/Osmantic/ODS): **one installer** turns a PC/Mac/Linux box into a private AI server — inference, chat UI, voice, agents, workflows, RAG, image gen, all in Docker, CPU fallback included. |
 | [`ship-an-app-free`](skills/ship-an-app-free.md) | Idea → working app → **public URL**, on free tiers only. GitHub Pages + Actions, Cloudflare Workers when you need a backend. No credit card, no server to rent. |
+| [`github-actions-image-pipeline`](skills/github-actions-image-pipeline.md) | **Build once, deploy many.** GitHub Actions has no cross-workflow dependency, so two workflows that both build an image build it **twice on every push** — and an ML base is a **40–56 minute** build, cold. The division-of-labor fix: one workflow builds, deployers `docker buildx imagetools create`-retag the `:latest` in seconds. Plus the 10GB cache that evicts your base, the disk-reclaim an ML base needs on a hosted runner, the `actions: read` permission `github-script` silently needs, and the **never-exercised-path chain** — every step a workflow never ran fails on a real latent bug the first time it runs. |
 
 **Everything above is free.** No paid API key is required anywhere in that path.
 
@@ -286,6 +287,7 @@ motion, not five projects.
 | Skill | What it sets up |
 |-------|-----------------|
 | [`aither-adk`](skills/aither-adk.md) | The agent toolkit — `pip install aither-adk` → `adk onboard --quick` → `adk run`. Your model, your loop, your data on your box; manage from the portal. |
+| [`aither-discord-agent`](skills/aither-discord-agent.md) | Deploy any aither-adk agent as a **Discord bot** with one automated onboarding command — `adk onboard --discord` installs your pack, validates the bot token live, prints the invite link, verifies identity/tools, and launches. Every DM/@mention runs your agent's own loop. No paid tier needed (hand-rolled fallback). |
 | [`aithernode`](skills/aithernode.md) | The *body* — a local MCP server (`adk mcp node`) exposing GPU, local inference, ComfyUI, and files to agents; or bootstrap the box as a full inference node. |
 | [`aitherconnect`](skills/aitherconnect.md) | The seam — `adk connect` / `adk mesh onboard` (`--headscale` behind NAT) to wire a machine, agent, and browser into AitherOS and the mesh. |
 | [`aitherzero`](skills/aitherzero.md) | The provisioner — one `config.psd1` + `bootstrap.ps1` to stand up bare-metal/on-prem/cloud/hybrid, with a generated-from-inventory config editor and `az_*` agent tools. |

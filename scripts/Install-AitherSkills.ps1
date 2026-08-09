@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Install the aither-skills pack into whatever agents are on this machine.
 
