@@ -14,8 +14,18 @@ adk onboard --quick             # detect hardware, stand up inference, install a
 adk run --agents openclaw       # run an agent locally
 ```
 
-`curl -fsSL https://aitherium.com/install.sh | sh` does the same without a Python of your own
-(add `--full` for the whole stack, `--with-openclaw` to bundle the web-research agent).
+`curl -fsSL https://aitherium.com/install.sh | sh` bootstraps the toolkit without a Python of your own.
+After install, add an agent pack:
+
+```bash
+adk install pack:openclaw       # or hermes / claude-code
+```
+
+Verify it:
+
+```bash
+adk doctor                      # confirms toolkit, packs, and inference are ready
+```
 
 `adk onboard --quick` runs `adk quickstart-local`: it detects your CPU/RAM/GPU, picks a backend
 (**Ollama**, **llama.cpp**, or **vLLM**), pulls and serves a model, and verifies it. Prefer a hosted

@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+﻿#Requires -Version 7.0
 <#
 .SYNOPSIS
     Resume-ClaudeSessions — reopen killed Claude Code sessions across all your

@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+﻿#Requires -Version 7.0
 <#
 .SYNOPSIS
     Splice (replace) a range of lines in a target file with content from a source file or inline text.
