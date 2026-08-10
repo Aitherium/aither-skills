@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1",
+  "name": "aither-skills",
+  "description": "Portable agent skills \u2014 self-contained procedures an agent loads on demand, publishable to any harness.",
+  "url": "https://aitherium.github.io/aither-skills/",
+  "repository": "https://github.com/Aitherium/aither-skills",
+  "kind": "corpus",
+  "language": "Markdown",
+  "license": "Apache-2.0",
+  "metrics": {
+    "skills": {
+      "value": 60,
+      "as_of": "2026-08-10T08:33:23Z"
+    }
+  },
+  "generated_at": "2026-08-10T08:33:23Z",
+  "version": "{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/releases/releases#get-the-latest-release\",\"status\":\"404\"}"
+}
