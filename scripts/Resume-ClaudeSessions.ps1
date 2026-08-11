@@ -217,8 +217,36 @@ function Get-LiveClaudeSessions {
         $ticks = [int64]0
         $haveClaim = $o.procStart -and [int64]::TryParse([string]$o.procStart, [ref]$ticks)
         if ($haveClaim -and $st) {
-            # 10s tolerance: same process, not a pid the OS handed to someone else.
-            if ([Math]::Abs($ticks - $st.Ticks) -gt 100000000L) { continue }
+            # procStart carries TWO different clocks depending on the Claude Code
+            # build, and comparing against the wrong one rejects EVERY session:
+            #   >= 2.1.x  Windows FILETIME  — 100ns since 1601-01-01 UTC
+            #   older     .NET DateTime.Ticks — 100ns since 0001-01-01, LOCAL
+            # They differ by ~5.049e17 ticks (the 0001->1601 epoch gap, 1600 years,
+            # minus the local UTC offset), which is astronomically larger than any
+            # tolerance — so a single-clock comparison does not degrade, it fails
+            # 100% of the time.
+            #
+            # Measured 2026-08-09 on Claude Code 2.1.225: 19 live interactive
+            # sessions, all 19 rejected, delta 504910980000000000 ticks each. The
+            # snapshot was therefore never written, and the anti-shrink guard
+            # faithfully preserved a 4-day-old snapshot of 7 sessions — so a
+            # post-reboot -Restore would have reopened the WRONG SET, silently.
+            # This is the exact failure mode the D-1327 comment above warns about,
+            # arriving through a different door: the evidence was not missing, it
+            # was being read in the wrong unit.
+            #
+            # Accept EITHER interpretation. Matching one clock is proof of identity;
+            # matching neither is proof of a recycled pid. Being permissive across
+            # units costs nothing (the two epochs are 1600 years apart, so a claim
+            # cannot accidentally satisfy both) and makes this forward- AND
+            # backward-compatible across Claude Code versions.
+            $tolerance = 100000000L      # 10s, in 100ns ticks
+            $asNetTicks = $st.Ticks
+            $asFileTime = [int64]0
+            try { $asFileTime = $st.ToUniversalTime().ToFileTimeUtc() } catch { }
+            $matchesNet  = [Math]::Abs($ticks - $asNetTicks) -le $tolerance
+            $matchesFile = $asFileTime -ne 0 -and [Math]::Abs($ticks - $asFileTime) -le $tolerance
+            if (-not ($matchesNet -or $matchesFile)) { continue }
         }
         elseif ($p.ProcessName -notmatch '(?i)claude|node') {
             # No usable start-time evidence (older state file, or StartTime not
