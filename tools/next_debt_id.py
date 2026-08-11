@@ -1,8 +1,8 @@
 """Allocate the next free debt-ledger id — atomically, so it cannot collide.
 
-    python AitherOS/dev/tools/next_debt_id.py          # -> D-991  (reserves it)
-    python AitherOS/dev/tools/next_debt_id.py --audit  # report duplicate ids
-    python AitherOS/dev/tools/next_debt_id.py --release D-991   # give one back
+    python tools/next_debt_id.py          # -> D-991  (reserves it)
+    python tools/next_debt_id.py --audit  # report duplicate ids
+    python tools/next_debt_id.py --release D-991   # give one back
 
 WHY THIS IS NOT JUST max()+1
 ----------------------------
