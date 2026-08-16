@@ -1,16 +1,16 @@
 """Allocate the next free debt-ledger id — atomically, so it cannot collide.
 
-    python tools/next_debt_id.py          # -> D-991  (reserves it)
+    python tools/next_debt_id.py          # -> the next free id, reserved
     python tools/next_debt_id.py --audit  # report duplicate ids
-    python tools/next_debt_id.py --release D-991   # give one back
+    python tools/next_debt_id.py --release <id>    # give one back
 
 WHY THIS IS NOT JUST max()+1
 ----------------------------
 It used to be. It scanned the whole ledger, printed max+1, and RESERVED NOTHING
 — so two sessions that ran it minutes apart both got the same number and both
 appended. Its docstring claimed it "kills concurrent-session id collisions"; an
-audit on 2026-07-25 found **166 ids used more than once across 370 rows**, with
-D-277 used five times. Scanning harder cannot fix a race: the read was never the
+audit on 2026-07-25 found **166 ids used more than once across 370 rows**, the
+worst of them used five times. Scanning harder cannot fix a race: the read was never the
 problem, the missing write was.
 
 Allocation now takes an exclusive reservation file per id (`O_CREAT|O_EXCL`,
@@ -42,7 +42,7 @@ _ID_RE = re.compile(r"\bD-(\d{1,5})\b")
 def _ledger_ids(text: str) -> set[int]:
     """Every id the ledger mentions anywhere.
 
-    Deliberately not just row starts: renumber notes ("RENUMBERED from D-953")
+    Deliberately not just row starts: renumber notes ("RENUMBERED from <id>")
     and `[[D-xxx]]` cross-references also permanently reserve an id, because
     reusing one silently repoints an existing reference.
     """
@@ -76,11 +76,16 @@ def _repo_root() -> Path:
         out = subprocess.run(
             ["git", "-C", str(here), "rev-parse", "--show-toplevel"],
             capture_output=True, text=True, timeout=15,
+            encoding="utf-8", errors="replace",
         )
         if out.returncode == 0 and out.stdout.strip():
             return Path(out.stdout.strip())
-    except (OSError, subprocess.SubprocessError):
-        pass
+    except (OSError, subprocess.SubprocessError) as exc:
+        # Fall through to the walk — but SAY SO. A silent handler here turns
+        # "git is not on PATH" into "the ledger is somewhere else", and the
+        # walk then picks a plausible wrong root without anyone noticing.
+        print(f"note: git rev-parse failed ({exc}); falling back to a "
+              f"parent walk for the ledger root", file=sys.stderr)
     for parent in [here, *here.parents]:
         if (parent / LEDGER_NAME).is_file() or (parent / ".git").exists():
             return parent
@@ -93,7 +98,7 @@ def _remote_ids(repo_root: Path, refs: tuple[str, ...] = REMOTE_REFS) -> set[int
     The reservation file only serialises processes sharing this checkout. It
     does nothing about the other half of the race: a session that already
     PUSHED a row while this checkout is behind origin. That is not theoretical
-    — the first id this tool allocated after being fixed (D-990) collided with
+    — the first id this tool allocated after being fixed collided with
     a row another session had already pushed, because the local file was stale.
 
     Best-effort by design: no fetch (too slow and side-effecting for an id
@@ -151,10 +156,15 @@ def allocate(
     if check_remote:
         try:
             used |= _remote_ids(ledger.parent)
-        except Exception:  # noqa: BLE001 - an id lookup must never fail hard
+        except Exception as exc:  # noqa: BLE001 - an id lookup must never fail hard
             # Losing the remote view risks a collision; failing to allocate at
-            # all blocks every session. Degrade, do not stop.
-            pass
+            # all blocks every session. Degrade, do not stop — but VISIBLY:
+            # the whole reason for the remote view is that a local-only read
+            # already handed out a colliding id once, and a silent degrade
+            # returns to exactly that state while looking identical.
+            print(f"warning: could not read remote ids ({exc}); allocating from "
+                  f"the LOCAL view only — a concurrently pushed row could collide",
+                  file=sys.stderr)
     candidate = start if start is not None else (max(used) + 1 if used else 1)
     while True:
         if candidate in used:
