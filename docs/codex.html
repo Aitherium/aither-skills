@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Developer Codex - how to run a coding agent so the result survives</title>
+<meta name="description" content="Eighteen laws for running coding agents at program scale, distilled from real incidents on a live platform. Plus a four-chapter ramp for anyone who has never used an agent. Free, MIT licensed.">
+<meta property="og:title" content="The Developer Codex - how to run a coding agent so the result survives">
+<meta property="og:description" content="Eighteen laws for running coding agents at program scale, distilled from real incidents on a live platform. Plus a four-chapter ramp for anyone who has never used an agent. Free, MIT licensed.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0A0F1E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' font-family='Georgia,serif' font-weight='700' fill='%237FDBEA'>Ai</text></svg>">
+<style>/* ═══════════════════════════════════════════════════════════════════════════
+   AITHERIUM WEB DESIGN LANGUAGE — canonical static-page stylesheet
+   @element-tokens v2
+
+   Source of truth for every public-facing STATIC page (GitHub Pages landing
+   sites, generated docs). Tokens are extracted from the live aitherium.com
+   design system (the dark-glass OKLch theme) so static pages match the estate
+   instead of inventing a look. NOTE: this file is INLINED VERBATIM into public
+   pages, so it must name no internal path — publish_gate scans for them.
+
+   Consumed by tools/gen_public_pages.py, which INLINES this file verbatim into
+   each generated page and fails loudly if it is missing. Edit HERE, then
+   regenerate; never restyle a generated docs/index.html by hand.
+
+   Class contract (the generator's template depends on these):
+     .wrap nav .brand .eyebrow .lede .cta .btn .btn-p .btn-s
+     .code .grid .card .stats .stat .note footer .el h1 .g
+   v2 adds:
+     --accent (+ -a04/-a10/-a30/-a50/-glow) .... per-experience accent, set per repo
+     .uni .uni-stage .uni-canvas .uni-nodes .orb .orb.here ... the universe strip
+     .exp .exp .glyph ......................... the experience badge
+     .panel .panel-hd .field .field-row .chips .chip
+     .rows .row-item .empty .kv .bar-cmp .steps  live artifacts
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+*,*::before,*::after{box-sizing:border-box}
+
+:root{
+  /* ─── core surfaces (dark glass, OKLch — verbatim from Veil) ─── */
+  --background:oklch(0.07 0.015 250);
+  --surface:oklch(0.12 0.02 250);
+  --surface-2:oklch(0.15 0.025 250);
+  --foreground:oklch(0.95 0 0);
+  --tx-2:oklch(0.72 0.02 250);
+  --tx-muted:oklch(0.55 0.02 250);
+  --border:oklch(0.25 0.03 250);
+
+  /* ─── accents ─── */
+  --primary:oklch(0.50 0.16 250);
+  --cyan:oklch(0.80 0.13 195);
+  --accent-warm:oklch(0.75 0.16 45);
+  --lavender:oklch(0.78 0.12 290);
+  --mint:oklch(0.82 0.12 165);
+  --coral:oklch(0.78 0.14 25);
+  --ok:var(--mint);
+  --warn:oklch(0.80 0.15 85);
+
+  /* ─── per-experience accent ───────────────────────────────────────────
+     Each public repo is a named EXPERIENCE with its own accent, the same way
+     every sovereign agent on aitherium.com has one (agent-theme.ts: demiurge
+     is "The Forge", #f97316). The generator overrides this whole block per
+     repo; everything below themes off it, so a repo's identity is one edit
+     rather than a forked stylesheet. Defaults are the cyan house colour, so
+     an un-themed page still looks correct. */
+  --accent:oklch(0.80 0.13 195);
+  --accent-a04:oklch(0.80 0.13 195 / 4%);
+  --accent-a10:oklch(0.80 0.13 195 / 10%);
+  --accent-a30:oklch(0.80 0.13 195 / 30%);
+  --accent-a50:oklch(0.80 0.13 195 / 50%);
+  --accent-glow:oklch(0.80 0.13 195 / 18%);
+
+  /* ─── signature gradients (cyan → blue → purple) ─── */
+  --creation:linear-gradient(135deg,oklch(0.75 0.14 195),oklch(0.60 0.16 250),oklch(0.65 0.16 290));
+  --cta-gradient:linear-gradient(to right,oklch(0.55 0.15 200),oklch(0.45 0.18 240));
+
+  /* ─── type ─── */
+  --font-display:'Cinzel',Georgia,serif;
+  --font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  /* ─── shape & layout ─── */
+  --radius:14px;
+  --radius-xl:0.75rem;
+  --maxw:1080px;
+}
+
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;color-scheme:dark}
+body{
+  margin:0;background:var(--background);color:var(--foreground);
+  font-family:var(--font);font-weight:400;line-height:1.65;letter-spacing:-0.011em;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+
+/* ─── ambient field: cyan grid + blurred glow orbs (aitherium.com hero) ─── */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(var(--accent-a04) 1px,transparent 1px),
+    linear-gradient(90deg,var(--accent-a04) 1px,transparent 1px);
+  background-size:80px 80px;
+  -webkit-mask-image:radial-gradient(ellipse 60% 40% at 50% 12%,black 20%,transparent 70%);
+  mask-image:radial-gradient(ellipse 60% 40% at 50% 12%,black 20%,transparent 70%);
+}
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(900px 600px at 50% -10%,oklch(0.55 0.15 200 / 6%),transparent 60%),
+    radial-gradient(400px 400px at 18% 45%,oklch(0.50 0.18 280 / 4%),transparent 65%),
+    radial-gradient(300px 300px at 88% 70%,oklch(0.45 0.18 240 / 4%),transparent 65%);
+}
+
+.wrap{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:0 24px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* ─── nav: sticky glass panel ─── */
+nav{
+  position:sticky;top:0;z-index:20;
+  background:oklch(0.06 0.015 250 / 65%);
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border-bottom:1px solid oklch(1 0 0 / 8%);
+}
+nav .wrap{display:flex;align-items:center;gap:18px;height:60px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:500;color:var(--foreground)}
+.brand:hover{text-decoration:none}
+.brand .ai{
+  font-family:var(--font-display);font-weight:700;font-size:1.35rem;line-height:1;
+  background:var(--creation);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+nav .sp{flex:1}
+nav a.nl{color:var(--tx-2);font-size:.9rem;font-weight:500}
+nav a.nl:hover{color:var(--accent);text-decoration:none}
+@media(max-width:640px){nav a.nl.hide-sm{display:none}}
+
+/* ─── hero ─── */
+header{padding:88px 0 64px;position:relative}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);
+  font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);
+  border:1px solid var(--accent-a30);border-radius:999px;padding:5px 12px;
+  margin-bottom:22px;
+  background:oklch(0.12 0.02 250 / 60%);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+.eyebrow .dot{
+  width:6px;height:6px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 8px var(--accent);
+  animation:pulse-dot 2.4s ease-in-out infinite;
+}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.45}}
+h1{
+  font-family:var(--font-display);
+  font-size:clamp(2.4rem,6vw,4rem);font-weight:700;line-height:1.08;
+  letter-spacing:-0.01em;margin:0 0 18px;
+}
+h1 .g{
+  background:var(--creation);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.lede{font-size:clamp(1.03rem,2.1vw,1.22rem);color:var(--tx-2);max-width:62ch;margin:0 0 30px;line-height:1.8}
+.cta{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:34px}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;padding:12px 22px;
+  border-radius:var(--radius-xl);font-weight:600;font-size:.94rem;
+  border:1px solid transparent;cursor:pointer;
+  transition:all .25s cubic-bezier(0.16,1,0.3,1);
+}
+.btn:hover{text-decoration:none;transform:translateY(-2px)}
+.btn-p{
+  background:var(--cta-gradient);color:#fff;
+  box-shadow:0 8px 24px oklch(0.55 0.15 200 / 25%);
+}
+.btn-p:hover{box-shadow:0 8px 32px oklch(0.55 0.15 200 / 40%)}
+.btn-s{
+  background:oklch(1 0 0 / 5%);color:var(--foreground);
+  border-color:oklch(1 0 0 / 8%);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+.btn-s:hover{background:oklch(1 0 0 / 10%);border-color:var(--accent-a50);color:var(--accent)}
+
+/* ─── code blocks: glass with gradient hairline ─── */
+.code{
+  position:relative;
+  background:oklch(0.06 0.015 250 / 65%);
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid oklch(1 0 0 / 8%);
+  border-radius:var(--radius);overflow:hidden;
+  box-shadow:0 8px 32px oklch(0 0 0 / 40%),inset 0 1px 0 oklch(1 0 0 / 5%);
+}
+.code::before{content:"";position:absolute;inset:0 0 auto;height:1px;background:var(--creation)}
+.code .bar{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 8%)}
+.code .bar > span:not(.t){width:9px;height:9px;flex:none;border-radius:50%;background:var(--border)}
+.code .bar .t{
+  line-height:1;margin-left:6px;font-family:var(--mono);font-size:.73rem;
+  color:var(--tx-muted);letter-spacing:.04em;
+}
+.code pre{
+  margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);
+  font-size:.845rem;line-height:1.75;color:var(--foreground);
+}
+.code .c{color:var(--tx-muted)}
+.code .k{color:var(--accent)}
+.code .s{color:var(--mint)}
+.copy{
+  position:absolute;top:8px;right:10px;background:transparent;
+  border:1px solid oklch(1 0 0 / 12%);color:var(--tx-muted);border-radius:7px;
+  padding:4px 9px;font-size:.7rem;cursor:pointer;font-family:var(--mono);transition:.16s;
+}
+.copy:hover{color:var(--accent);border-color:var(--accent-a50)}
+
+/* ─── sections ─── */
+section{padding:64px 0;border-top:1px solid oklch(1 0 0 / 6%)}
+h2{
+  font-family:var(--font-display);
+  font-size:clamp(1.55rem,3vw,2.1rem);font-weight:700;letter-spacing:-0.01em;
+  margin:0 0 10px;
+}
+.sub{color:var(--tx-2);margin:0 0 30px;max-width:64ch;line-height:1.8}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(258px,1fr))}
+
+/* ─── cards: glass surface, glow on hover ─── */
+.card{
+  background:oklch(0.12 0.02 250 / 60%);
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid oklch(0.40 0.05 250 / 20%);
+  border-radius:var(--radius);padding:22px;position:relative;overflow:hidden;
+  box-shadow:0 8px 32px oklch(0 0 0 / 30%),inset 0 1px 0 oklch(1 0 0 / 5%);
+  transition:all .25s cubic-bezier(0.16,1,0.3,1);
+}
+.card:hover{
+  transform:translateY(-2px);
+  border-color:var(--accent-a30);
+  box-shadow:0 8px 32px oklch(0 0 0 / 40%),0 0 20px var(--accent-glow),
+    inset 0 1px 0 oklch(1 0 0 / 8%);
+}
+.card h3{margin:0 0 8px;font-size:1.03rem;font-weight:600;letter-spacing:-0.012em}
+.card p{margin:0;color:var(--tx-2);font-size:.92rem;line-height:1.7}
+.card .ico{
+  font-family:var(--mono);font-size:.7rem;color:var(--accent);letter-spacing:.14em;
+  text-transform:uppercase;display:block;margin-bottom:10px;
+}
+
+/* ─── stat tiles ─── */
+.stats{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:30px}
+.stat{
+  background:oklch(0.12 0.02 250 / 60%);
+  backdrop-filter:blur(12px) saturate(150%);
+  -webkit-backdrop-filter:blur(12px) saturate(150%);
+  border:1px solid oklch(1 0 0 / 8%);
+  border-radius:var(--radius);padding:18px;text-align:center;
+}
+.stat .v{
+  font-family:var(--mono);font-size:1.55rem;font-weight:700;display:block;line-height:1.2;
+  background:var(--creation);-webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.stat .l{font-size:.76rem;color:var(--tx-muted);text-transform:uppercase;letter-spacing:.1em;margin-top:5px;display:block}
+
+/* ─── callout note ─── */
+.note{
+  background:oklch(0.12 0.02 250 / 60%);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border:1px solid oklch(1 0 0 / 8%);border-left:3px solid var(--warn);
+  border-radius:10px;padding:16px 18px;color:var(--tx-2);font-size:.92rem;line-height:1.7;
+}
+.note strong{color:var(--foreground)}
+
+/* ─── footer ─── */
+footer{border-top:1px solid oklch(1 0 0 / 6%);padding:34px 0 46px;color:var(--tx-muted);font-size:.86rem}
+footer .row{display:flex;flex-wrap:wrap;gap:16px;align-items:center}
+footer .sp{flex:1}
+footer a{color:var(--tx-2)}
+.el{
+  display:inline-flex;flex-direction:column;align-items:center;justify-content:center;
+  width:56px;height:56px;border-radius:10px;
+  border:1px solid oklch(1 0 0 / 8%);
+  background:oklch(0.12 0.02 250 / 60%);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  position:relative;overflow:hidden;
+}
+.el::before{content:"";position:absolute;inset:0 0 auto;height:1px;background:var(--creation)}
+.el .n{font-family:var(--mono);font-size:.56rem;color:var(--tx-muted);line-height:1}
+.el .s{
+  font-family:var(--font-display);font-weight:700;font-size:1.2rem;line-height:1.2;
+  background:var(--creation);-webkit-background-clip:text;background-clip:text;color:transparent;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE UNIVERSE STRIP
+   The four public repos are organs of one system, and until now nothing on
+   the pages said so — the nav linked Features / Quick start / GitHub and
+   stopped. This renders the constellation on EVERY page: the current repo lit
+   and centred, its siblings dimmed but reachable. The links are real anchors
+   in the HTML, so it works with JS off; universe.js only adds the drifting
+   flight paths behind them.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.uni{position:relative;padding:38px 0 30px;border-top:1px solid oklch(1 0 0 / 6%)}
+.uni h2{font-size:clamp(1.15rem,2.2vw,1.4rem);margin-bottom:4px}
+.uni .sub{margin-bottom:22px;font-size:.92rem}
+/* The top band is deliberate empty room: the flight paths arc UP out of the orb
+   row into it. Without it the curves are drawn underneath the cards and are
+   invisible except in the 12px gutters, which looked like the canvas was dead. */
+.uni-stage{position:relative;min-height:190px;padding-top:52px}
+.uni-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.uni-nodes{
+  position:relative;z-index:1;display:grid;gap:12px;
+  grid-template-columns:repeat(auto-fit,minmax(146px,1fr));
+}
+.orb{
+  position:relative;
+  display:flex;flex-direction:column;gap:6px;padding:15px 14px;
+  border-radius:var(--radius);text-align:left;
+  background:oklch(0.12 0.02 250 / 55%);
+  backdrop-filter:blur(14px) saturate(160%);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);
+  border:1px solid oklch(1 0 0 / 7%);
+  transition:all .28s cubic-bezier(0.16,1,0.3,1);
+}
+.orb:hover{
+  text-decoration:none;transform:translateY(-3px);
+  border-color:var(--accent-a30);
+  box-shadow:0 10px 30px oklch(0 0 0 / 40%),0 0 22px var(--accent-glow);
+}
+.orb .k{
+  font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--tx-muted);display:flex;align-items:center;gap:7px;
+}
+.orb .k::before{
+  content:"";width:7px;height:7px;border-radius:50%;flex:none;
+  background:var(--orb,var(--tx-muted));box-shadow:0 0 9px var(--orb,transparent);
+}
+.orb .n{font-weight:600;font-size:.96rem;color:var(--foreground);letter-spacing:-0.01em}
+.orb .d{font-size:.79rem;color:var(--tx-muted);line-height:1.5}
+/* you are here */
+.orb.here{
+  border-color:var(--accent-a50);
+  background:oklch(0.14 0.03 250 / 70%);
+  box-shadow:0 0 0 1px var(--accent-a30),0 10px 34px var(--accent-glow);
+}
+.orb.here .n{color:var(--accent)}
+/* A pill on the top edge, not an ::after inside .k — inline it wrapped onto
+   three lines and made the lit card taller than every sibling. */
+.orb.here::after{
+  content:"you are here";position:absolute;top:-8px;left:14px;
+  font-family:var(--mono);font-size:.56rem;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--background);background:var(--accent);
+  padding:3px 8px;border-radius:999px;white-space:nowrap;
+}
+
+/* ─── experience badge: this repo's name in the estate ─── */
+/* display:flex, not inline-flex — inline it sat on the same line as .eyebrow
+   and the two badges read as one run-on chip. */
+.exp{
+  display:flex;align-items:center;gap:10px;margin-bottom:16px;
+  font-family:var(--font-display);font-size:.9rem;letter-spacing:.04em;
+  color:var(--tx-2);
+}
+.exp .glyph{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border-radius:9px;font-size:.95rem;
+  background:var(--accent-a10);border:1px solid var(--accent-a30);
+}
+.exp b{color:var(--accent);font-weight:700}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIVE ARTIFACTS
+   Each repo's page carries one real, interactive thing built from the payload
+   being published — a browsable catalogue, a composer, a calculator — instead
+   of six paragraphs of feature copy telling you to go and run `ls`.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.panel{
+  background:oklch(0.10 0.02 250 / 60%);
+  backdrop-filter:blur(20px) saturate(170%);
+  -webkit-backdrop-filter:blur(20px) saturate(170%);
+  border:1px solid oklch(1 0 0 / 8%);
+  border-radius:var(--radius);overflow:hidden;
+  box-shadow:0 8px 32px oklch(0 0 0 / 30%);
+}
+.panel-hd{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:13px 16px;border-bottom:1px solid oklch(1 0 0 / 8%);
+  background:oklch(0.08 0.02 250 / 50%);
+}
+.panel-hd .t{font-family:var(--mono);font-size:.74rem;color:var(--tx-muted);letter-spacing:.06em}
+.panel-hd .sp{flex:1}
+.count{font-family:var(--mono);font-size:.74rem;color:var(--accent)}
+
+.field{
+  width:100%;padding:10px 13px;border-radius:9px;font-family:var(--font);font-size:.9rem;
+  background:oklch(0.06 0.015 250 / 70%);color:var(--foreground);
+  border:1px solid oklch(1 0 0 / 10%);
+}
+.field::placeholder{color:var(--tx-muted)}
+.field:focus{outline:none;border-color:var(--accent-a50);box-shadow:0 0 0 3px var(--accent-a10)}
+.field-row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));padding:16px}
+.field-row label{display:block;font-size:.74rem;color:var(--tx-muted);margin-bottom:6px;
+  text-transform:uppercase;letter-spacing:.09em;font-family:var(--mono)}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px;padding:12px 16px;border-bottom:1px solid oklch(1 0 0 / 6%)}
+.chip{
+  font-family:var(--mono);font-size:.71rem;padding:5px 11px;border-radius:999px;cursor:pointer;
+  background:oklch(1 0 0 / 4%);border:1px solid oklch(1 0 0 / 9%);color:var(--tx-2);
+  transition:.18s;
+}
+.chip:hover{border-color:var(--accent-a30);color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent-a10);border-color:var(--accent-a50);color:var(--accent)}
+
+.rows{max-height:432px;overflow-y:auto}
+.row-item{
+  display:block;width:100%;text-align:left;padding:13px 16px;cursor:pointer;
+  border:0;border-bottom:1px solid oklch(1 0 0 / 5%);
+  background:transparent;color:inherit;font-family:var(--font);transition:.16s;
+}
+.row-item:hover{background:var(--accent-a10);text-decoration:none}
+.row-item .n{display:block;font-weight:600;font-size:.9rem;color:var(--foreground)}
+.row-item .d{display:block;font-size:.8rem;color:var(--tx-muted);line-height:1.55;margin-top:3px}
+.row-item .tag{
+  font-family:var(--mono);font-size:.65rem;color:var(--accent);
+  letter-spacing:.1em;text-transform:uppercase;
+}
+.empty{padding:34px 16px;text-align:center;color:var(--tx-muted);font-size:.88rem}
+
+/* key→value readout (calculator results, composed manifests) */
+.kv{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));padding:16px}
+.kv .cell{padding:13px;border-radius:10px;background:oklch(1 0 0 / 3%);border:1px solid oklch(1 0 0 / 7%)}
+.kv .cell .l{display:block;font-size:.68rem;color:var(--tx-muted);text-transform:uppercase;
+  letter-spacing:.1em;font-family:var(--mono)}
+.kv .cell .v{display:block;font-family:var(--mono);font-size:1.22rem;font-weight:700;margin-top:5px;
+  background:var(--creation);-webkit-background-clip:text;background-clip:text;color:transparent}
+.kv .cell.flat .v{background:none;color:var(--foreground);-webkit-text-fill-color:currentColor}
+
+/* compression / ratio bar */
+.bar-cmp{padding:0 16px 16px}
+.bar-cmp .track{height:9px;border-radius:99px;background:oklch(1 0 0 / 6%);overflow:hidden;margin-bottom:7px}
+.bar-cmp .fill{height:100%;background:var(--creation);border-radius:99px;transition:width .35s ease}
+.bar-cmp .lbl{display:flex;justify-content:space-between;font-family:var(--mono);
+  font-size:.71rem;color:var(--tx-muted)}
+
+/* ordered step sequence (playbooks) */
+.steps{list-style:none;margin:0;padding:16px;display:flex;flex-direction:column;gap:0}
+.steps li{position:relative;padding:0 0 16px 26px;font-size:.87rem;color:var(--tx-2)}
+.steps li:last-child{padding-bottom:0}
+.steps li::before{
+  content:"";position:absolute;left:0;top:5px;width:9px;height:9px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 8px var(--accent-glow);
+}
+.steps li:not(:last-child)::after{
+  content:"";position:absolute;left:4px;top:16px;bottom:2px;width:1px;background:oklch(1 0 0 / 12%);
+}
+.steps li b{color:var(--foreground);font-weight:600}
+
+/* ─── motion ─── */
+@keyframes fade-in-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+header .wrap>*{animation:fade-in-up .6s ease-out both}
+header .wrap>*:nth-child(2){animation-delay:.05s}
+header .wrap>*:nth-child(3){animation-delay:.1s}
+header .wrap>*:nth-child(4){animation-delay:.15s}
+header .wrap>*:nth-child(5){animation-delay:.2s}
+header .wrap>*:nth-child(6){animation-delay:.25s}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ─── scrollbar ─── */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:oklch(0.08 0.015 250)}
+::-webkit-scrollbar-thumb{background:oklch(0.25 0.03 250);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:oklch(0.35 0.05 260)}
+</style>
+<style>:root{--accent:oklch(0.80 0.13 195);--accent-a04:oklch(0.80 0.13 195 / 4%);--accent-a10:oklch(0.80 0.13 195 / 10%);--accent-a30:oklch(0.80 0.13 195 / 30%);--accent-a50:oklch(0.80 0.13 195 / 50%);--accent-glow:oklch(0.80 0.13 195 / 18%);}</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a class="brand" href="https://aitherium.com"><span class="ai">Ai</span><span>Aitherium</span></a>
+  <span class="sp"></span>
+  <a class="nl hide-sm" href="#catalogue">Read the laws</a>
+  <a class="nl hide-sm" href="#start">Quick start</a>
+  <a class="nl" href="#universe">The estate</a>
+  <a class="nl" href="index.html">Skills pack</a>
+  <a class="nl" href="https://github.com/Aitherium/awskills">GitHub</a>
+</div></nav>
+
+<header><div class="wrap">
+  <div class="eyebrow"><span class="dot"></span>MIT · the developer codex</div>
+  <div class="exp"><span class="glyph">◈</span>
+    <span>You are in <b>The Armory</b> — What will you teach it?</span>
+  </div>
+  <h1>Code that <span class="g">tells you when it is wrong</span></h1>
+  <p class="lede">An agent will finish a task, report success, and be completely wrong - not because it lied, but because nothing in its loop could ever have found out. Every law here is one way a system was made able to find out. All eighteen were a real failure first.</p>
+  <div class="cta">
+    <a class="btn btn-p" href="#start">Get started</a>
+    <a class="btn btn-s" href="https://github.com/Aitherium/awskills">View source</a>
+  </div>
+  <div class="code"><div class="bar"><span></span><span></span><span></span><span class="t">bash</span></div><pre><span class="c"># the codex, the doctrine and 70+ skills - one clone</span>
+<span class="k">git clone https://github.com/Aitherium/awskills</span>
+<span class="k">cd awskills &amp;&amp; bash scripts/install-awskills.sh</span>
+
+<span class="c"># then, to your agent:</span>
+<span class="k">&quot;use the code-like-david skill&quot;</span></pre></div>
+  <div class="stats"><div class="stat"><span class="v">18</span><span class="l">laws</span></div><div class="stat"><span class="v">4</span><span class="l">chapters</span></div><div class="stat"><span class="v">MIT</span><span class="l">license</span></div><div class="stat"><span class="v">0</span><span class="l">dependencies</span></div></div>
+</div></header>
+
+<section id="catalogue"><div class="wrap"><h2>The codex, in full</h2><p class="sub">Four chapters to get from nothing to a working setup, then eighteen laws. Filter by part, or search for the failure you are actually looking at. Every row opens the document.</p><div class="panel" data-catalogue="22"><div class="panel-hd"><span class="t">codex/</span><span class="sp"></span><span class="count js-count">22 of 22</span></div><div class="field-row"><div><label for="cat-q">search</label><input class="field js-q" id="cat-q" type="search" placeholder="search - e.g. silence, deploy, gate, ratchet, empty" autocomplete="off"></div></div><div class="chips"><button class="chip" type="button" aria-pressed="false" data-tag="start here">start here</button><button class="chip" type="button" aria-pressed="false" data-tag="enforcement">enforcement</button><button class="chip" type="button" aria-pressed="false" data-tag="silence">silence</button><button class="chip" type="button" aria-pressed="false" data-tag="adoption">adoption</button><button class="chip" type="button" aria-pressed="false" data-tag="deployment">deployment</button><button class="chip" type="button" aria-pressed="false" data-tag="trust">trust</button></div><div class="rows"><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/path/00-what-this-actually-is.md" data-tag="start here" data-search="what this actually is an agent is a loop with tools, not an oracle start here"><span class="n">What this actually is</span><span class="d">an agent is a loop with tools, not an oracle</span><span class="tag">start here</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/path/01-your-first-hour.md" data-tag="start here" data-search="your first hour one real change, verified, on your own repo start here"><span class="n">Your first hour</span><span class="d">one real change, verified, on your own repo</span><span class="tag">start here</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/path/02-your-own-hardware.md" data-tag="start here" data-search="run it on your own hardware what a local model is actually good at start here"><span class="n">Run it on your own hardware</span><span class="d">what a local model is actually good at</span><span class="tag">start here</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/path/03-give-it-hands.md" data-tag="start here" data-search="give it hands tools, skills and packs start here"><span class="n">Give it hands</span><span class="d">tools, skills and packs</span><span class="tag">start here</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/01-a-rule-nothing-asserts-is-a-suggestion.md" data-tag="enforcement" data-search="a rule nothing asserts is a suggestion the first law, and the one the other seventeen depend on enforcement"><span class="n">A rule nothing asserts is a suggestion</span><span class="d">the first law, and the one the other seventeen depend on</span><span class="tag">enforcement</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/02-make-it-a-check-not-a-ticket.md" data-tag="enforcement" data-search="make it a check, not a ticket a mechanically-detectable defect must never be discharged by writing it down enforcement"><span class="n">Make it a check, not a ticket</span><span class="d">a mechanically-detectable defect must never be discharged by writing it down</span><span class="tag">enforcement</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/03-watch-your-gate-fail.md" data-tag="enforcement" data-search="watch your gate fail a checker nobody has seen fail is not a gate enforcement"><span class="n">Watch your gate fail</span><span class="d">a checker nobody has seen fail is not a gate</span><span class="tag">enforcement</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/04-mutate-the-test-not-just-the-code.md" data-tag="enforcement" data-search="mutate the test, not just the code a fixture that cannot fail proves nothing enforcement"><span class="n">Mutate the test, not just the code</span><span class="d">a fixture that cannot fail proves nothing</span><span class="tag">enforcement</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/05-design-for-the-silence.md" data-tag="silence" data-search="design for the silence the expensive failures do not raise silence"><span class="n">Design for the silence</span><span class="d">the expensive failures do not raise</span><span class="tag">silence</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/06-a-check-that-cannot-run-must-not-pass.md" data-tag="silence" data-search="a check that cannot run must not pass silence is not a verdict silence"><span class="n">A check that cannot run must not pass</span><span class="d">silence is not a verdict</span><span class="tag">silence</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/07-the-symptom-names-the-innocent.md" data-tag="silence" data-search="the symptom names the innocent follow the wire, not the error text silence"><span class="n">The symptom names the innocent</span><span class="d">follow the wire, not the error text</span><span class="tag">silence</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/08-a-checker-in-the-wrong-place-found-nothing.md" data-tag="silence" data-search="a checker in the wrong place found nothing and that is indistinguishable from a clean pass silence"><span class="n">A checker in the wrong place found nothing</span><span class="d">and that is indistinguishable from a clean pass</span><span class="tag">silence</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/09-detection-without-delivery-is-not-detection.md" data-tag="silence" data-search="detection without delivery is not detection the alert path is the one thing you cannot verify by using it silence"><span class="n">Detection without delivery is not detection</span><span class="d">the alert path is the one thing you cannot verify by using it</span><span class="tag">silence</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/10-a-gate-that-floods-gets-switched-off.md" data-tag="adoption" data-search="a gate that floods gets switched off being right too loudly is how a rule dies adoption"><span class="n">A gate that floods gets switched off</span><span class="d">being right too loudly is how a rule dies</span><span class="tag">adoption</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/11-open-green-ratchet-down.md" data-tag="adoption" data-search="open green, ratchet down a gate that opens red gets bypassed, not satisfied adoption"><span class="n">Open green, ratchet down</span><span class="d">a gate that opens red gets bypassed, not satisfied</span><span class="tag">adoption</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/12-measure-it-again.md" data-tag="adoption" data-search="measure it again every number in your docs is decaying right now adoption"><span class="n">Measure it again</span><span class="d">every number in your docs is decaying right now</span><span class="tag">adoption</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/13-written-is-not-deployed.md" data-tag="deployment" data-search="written is not deployed ask the running thing, never the source deployment"><span class="n">Written is not deployed</span><span class="d">ask the running thing, never the source</span><span class="tag">deployment</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/14-you-wrote-it-that-does-not-mean-it-ships.md" data-tag="deployment" data-search="you wrote it; that does not mean it ships a file is tracked when the tooling says so deployment"><span class="n">You wrote it; that does not mean it ships</span><span class="d">a file is tracked when the tooling says so</span><span class="tag">deployment</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/15-generate-never-copy.md" data-tag="deployment" data-search="generate, never copy a comment asking people to keep two copies in step is not a gate deployment"><span class="n">Generate, never copy</span><span class="d">a comment asking people to keep two copies in step is not a gate</span><span class="tag">deployment</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/16-the-defect-lives-in-the-union.md" data-tag="deployment" data-search="the defect lives in the union every file is individually correct deployment"><span class="n">The defect lives in the union</span><span class="d">every file is individually correct</span><span class="tag">deployment</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/17-fail-closed-then-prove-the-happy-path.md" data-tag="trust" data-search="fail closed, then prove the happy path a gate that denies everything passes every denial test trust"><span class="n">Fail closed, then prove the happy path</span><span class="d">a gate that denies everything passes every denial test</span><span class="tag">trust</span></a><a class="row-item" href="https://github.com/Aitherium/awskills/blob/main/codex/laws/18-never-trust-the-caller.md" data-tag="trust" data-search="never trust the caller for an authorization decision the payload is not evidence trust"><span class="n">Never trust the caller for an authorization decision</span><span class="d">the payload is not evidence</span><span class="tag">trust</span></a></div><div class="empty js-empty" style="display:none">Nothing matches that.</div></div></div></section>
+
+<section id="features"><div class="wrap">
+  <h2>How to read it</h2>
+  <p class="sub">The laws are grouped into five parts. If you only have time for one, read Silence - those five cost the most per incident, because nothing tells you they happened.</p>
+  <div class="grid"><div class="card"><span class="ico">start</span><h3>Start here</h3><p>Never used a coding agent? Four chapters, about an hour, ending with one real verified change on your own repository. Covers local models and how to give an agent hands.</p></div><div class="card"><span class="ico">I</span><h3>Enforcement</h3><p>A standard nothing checks is a preference. How a preference becomes a property of the codebase - and why a checker nobody has watched fail is not a gate.</p></div><div class="card"><span class="ico">II</span><h3>Silence</h3><p>The expensive failures do not raise. They return 200, render correctly, log nothing, and leave the container healthy. A missing thing is indistinguishable from a thing nobody wanted.</p></div><div class="card"><span class="ico">III</span><h3>Adoption</h3><p>A gate only works while people keep it switched on. Most gates die of being right too loudly - so narrow the rule, pin the count, ratchet down.</p></div><div class="card"><span class="ico">IV</span><h3>Deployment</h3><p>The gap between the code you wrote and the code that is running. A build can succeed and ship nothing; a live mount makes the file current and leaves the process stale.</p></div><div class="card"><span class="ico">V</span><h3>Trust</h3><p>Two patterns no linter will catch, because both are semantic: the gate that fails open, and the decision keyed on input the caller chose.</p></div></div>
+</div></section>
+
+<section id="start"><div class="wrap">
+  <h2>Quick start</h2>
+  <p class="sub">The codex is markdown. Clone it, read it, or point your agent at it - the laws are written to be loaded by an agent as easily as by a person.</p>
+  <div class="code"><div class="bar"><span></span><span></span><span></span><span class="t">bash</span></div><pre><span class="k">git clone https://github.com/Aitherium/awskills</span>
+<span class="k">cd awskills</span>
+
+<span class="c"># the reading path</span>
+<span class="k">ls codex/path/</span>
+
+<span class="c"># the eighteen laws</span>
+<span class="k">ls codex/laws/</span>
+
+<span class="c"># install the doctrine into your agent&#x27;s config</span>
+<span class="k">bash scripts/install-awskills.sh</span></pre></div>
+  <div class="note"><strong>The laws are descriptive, not aspirational.</strong> Every number here was counted on a running system on the day it was written, and several of the incidents are ones where the first diagnosis was also wrong. Where a law contradicts something you know about your own stack, believe your stack and re-measure - that is <em>literally law twelve</em>.</div>
+</div></section>
+
+<section id="method"><div class="wrap"><h2>The whole method is four steps</h2><p class="sub">Not a reading list. The laws exist to be installed, and this is the loop that installs them. A codebase run this way gets harder to break over time without anyone having to be careful.</p><div class="rows"><div class="row-item"><span class="n">1 &middot; Something breaks</span><span class="d">A real failure, in production or in review. Not a hypothetical.</span></div><div class="row-item"><span class="n">2 &middot; You fix it</span><span class="d">Root cause, not a workaround. A workaround that cannot be avoided gets recorded with a date and a severity.</span></div><div class="row-item"><span class="n">3 &middot; You ask one question</span><span class="d"><em>Could a check have caught this?</em> This is the step everyone skips, and it is the only one that compounds.</span></div><div class="row-item"><span class="n">4 &middot; If yes, the check IS the work</span><span class="d">Write it. Watch it fail on purpose. Wire it somewhere unattended. Do not write a ticket - a ticket is the cheapest possible response to finding a defect, and it is why the same class recurs for weeks.</span></div></div></div></section>
+
+<section class="uni" id="universe"><div class="wrap"><h2>One estate, 7 doors</h2><p class="sub">These projects are organs of the same system — the same identity plane, the same agent runtime, the same operational discipline. Follow any of them.</p><div class="uni-stage"><canvas class="uni-canvas" aria-hidden="true"></canvas><div class="uni-nodes"><a class="orb" href="https://aitherium.com" data-id="aitherium" data-kind="the os" style="--orb:var(--cyan)"><span class="k">the os</span><span class="n">aitherium.com</span><span class="d">The Living OS these four repos are cut from. Open, no login.</span></a><a class="orb" href="https://aitherium.github.io/awdk/" data-id="awdk" data-kind="python" style="--orb:var(--accent-warm)"><span class="k">python</span><span class="n">Aither ADK</span><span class="d">Build AI agent fleets — 3 lines, any backend, local or cloud.</span></a><a class="orb here" href="https://aitherium.github.io/awskills/" data-id="awskills" data-kind="markdown" style="--orb:var(--cyan)"><span class="k">markdown</span><span class="n">awskills</span><span class="d">Portable agent skills — self-contained procedures an agent loads on demand.</span></a><a class="orb" href="https://aitherium.github.io/aitherkvcache/" data-id="aitherkvcache" data-kind="cuda" style="--orb:var(--lavender)"><span class="k">cuda</span><span class="n">aitherkvcache</span><span class="d">Near-optimal KV cache quantization for LLM inference — sub-byte compression.</span></a><a class="orb" href="https://aitherium.github.io/AitherZero/" data-id="AitherZero" data-kind="powershell" style="--orb:var(--mint)"><span class="k">powershell</span><span class="n">AitherZero</span><span class="d">PowerShell 7+ automation framework — numbered, self-describing scripts.</span></a><a class="orb" href="https://blog.aitherium.com" data-id="blog" data-kind="writing" style="--orb:var(--coral)"><span class="k">writing</span><span class="n">The Blog</span><span class="d">How all of it is actually built, measured and operated.</span></a><a class="orb" href="https://aitherium.github.io/awrun/" data-id="awrun" data-kind="python" style="--orb:var(--coral)"><span class="k">python</span><span class="n">awrun</span><span class="d">A priority-aware queue and dispatcher for agentic runs and ad-hoc CI builds.</span></a></div></div></div></section>
+
+<!-- The ecosystem constellation. It lives HERE, in the generator, because
+     these pages are regenerated on every sync: a mount hand-added to a repo's
+     docs/index.html is overwritten on the next run and looks like it was never
+     applied. Every generated page therefore carries it, and a repo that
+     publishes no manifest renders as `unknown` rather than vanishing. -->
+<section class="wrap" style="margin:3rem auto">
+  <h2>The ecosystem this belongs to</h2>
+  <p>Every Aitherium repository publishes an <code>aither-manifest.json</code> beside its
+  page, and each surface reads all of them — so the network is browsable from any node in
+  it. A repository that publishes nothing shows as <em>unknown</em>, never as zero.</p>
+  <div id="aither-constellation"
+       data-self="awskills"></div>
+</section>
+<script src="aither-constellation.js"></script>
+
+<footer><div class="wrap"><div class="row">
+  <span class="el"><span class="n">47</span><span class="s">Ai</span></span>
+  <div>
+    <div style="color:var(--foreground);font-weight:500">Aitherium — The Element of Creation</div>
+    <div>The Developer Codex &amp;middot; MIT licensed</div>
+  </div>
+  <span class="sp"></span>
+  <a href="https://github.com/Aitherium/awskills">GitHub</a>
+  <a href="https://github.com/Aitherium/awskills/blob/main/LICENSE">License</a>
+  <a href="https://blog.aitherium.com">Blog</a>
+  <a href="https://aitherium.com">aitherium.com</a>
+</div></div></footer>
+<script>
+document.querySelectorAll('.code').forEach(function(box){
+  var pre = box.querySelector('pre'); if(!pre) return;
+  var b = document.createElement('button');
+  b.className='copy'; b.type='button'; b.textContent='copy';
+  b.addEventListener('click', function(){
+    navigator.clipboard.writeText(pre.innerText.trim()).then(function(){
+      b.textContent='copied'; setTimeout(function(){b.textContent='copy';},1400);
+    }).catch(function(){ b.textContent='press ctrl+c'; });
+  });
+  box.appendChild(b);
+});
+
+/* catalogue: filter rows that are ALREADY in the HTML. Nothing is fetched and
+   nothing is rendered client-side, so the full inventory is present with JS off
+   and for anything crawling the page. */
+(function(){
+  var p = document.querySelector('[data-catalogue]');
+  if(!p) return;
+  var q = p.querySelector('.js-q');
+  var rows = Array.prototype.slice.call(p.querySelectorAll('.row-item'));
+  var chips = Array.prototype.slice.call(p.querySelectorAll('.chip'));
+  var out = p.querySelector('.js-count');
+  var empty = p.querySelector('.js-empty');
+  var tag = '';
+  function apply(){
+    var t = (q ? q.value : '').trim().toLowerCase(), n = 0;
+    rows.forEach(function(r){
+      var okTag = !tag || r.getAttribute('data-tag') === tag;
+      var okQ = !t || (r.getAttribute('data-search')||'').indexOf(t) !== -1;
+      var show = okTag && okQ;
+      r.style.display = show ? '' : 'none';
+      if(show) n++;
+    });
+    if(out) out.textContent = n + ' of ' + rows.length;
+    if(empty) empty.style.display = n ? 'none' : 'block';
+  }
+  if(q) q.addEventListener('input', apply);
+  chips.forEach(function(c){
+    c.addEventListener('click', function(){
+      var v = c.getAttribute('data-tag');
+      tag = (tag === v) ? '' : v;
+      chips.forEach(function(x){
+        x.setAttribute('aria-pressed', x.getAttribute('data-tag') === tag ? 'true' : 'false');
+      });
+      apply();
+    });
+  });
+  apply();
+})();
+
+/* KV-cache calculator: the arithmetic is the actual KV cache formula --
+   2 (K and V) x layers x kv_heads x head_dim x tokens x batch x bytes-per-element.
+   Compression is applied as bits/16 against fp16, which is what the quantizer
+   really does; no fudge factor. */
+(function(){
+  var c = document.getElementById('kvcalc');
+  if(!c) return;
+  var ids = ['layers','heads','dim','ctx','batch','bits'];
+  var el = {};
+  ids.forEach(function(k){ el[k] = c.querySelector('#kv-'+k); });
+  function num(k){ return Math.max(0, parseFloat(el[k] && el[k].value) || 0); }
+  function fmt(mb){
+    if(mb >= 1024) return (mb/1024).toFixed(mb/1024 >= 100 ? 0 : 2) + ' GB';
+    return mb.toFixed(mb < 10 ? 2 : 0) + ' MB';
+  }
+  function calc(){
+    var elems = 2 * num('layers') * num('heads') * num('dim') * num('ctx') * num('batch');
+    var bits = num('bits') || 4;
+    var fp16 = elems * 2 / 1048576;
+    var packed = elems * (bits/8) / 1048576;
+    var ratio = packed > 0 ? fp16/packed : 0;
+    var set = function(k, v){
+      var n = c.querySelector('[data-out="'+k+'"]');
+      if(n) n.textContent = v;
+    };
+    set('fp16', fmt(fp16));
+    set('packed', fmt(packed));
+    set('saved', fmt(Math.max(0, fp16-packed)));
+    set('ratio', ratio ? ratio.toFixed(1)+'x' : '--');
+    var fill = c.querySelector('.js-fill');
+    if(fill) fill.style.width = (fp16 > 0 ? Math.max(1.5, (packed/fp16)*100) : 0) + '%';
+    var pct = c.querySelector('.js-pct');
+    if(pct) pct.textContent = fp16 > 0 ? ((packed/fp16)*100).toFixed(1)+'% of fp16' : '';
+  }
+  ids.forEach(function(k){
+    if(el[k]) { el[k].addEventListener('input', calc); el[k].addEventListener('change', calc); }
+  });
+  calc();
+})();
+</script>
+<script>/* ═══════════════════════════════════════════════════════════════════════════
+   AITHERIUM UNIVERSE STRIP — flight paths between the public repos
+   @element-universe v1
+
+   Source of truth for the motion layer of the universe strip on every public
+   static page. tools/gen_public_pages.py INLINES this file verbatim, the same
+   way it inlines .ELEMENT/web/aitherium.css, and check_pages_truth.py asserts
+   a published page still carries the current copy.
+
+   WHY THIS IS NOT @aitheros/bead-space
+       bead-space is the real thing: a d3-force universe explorer with live
+       AitherOS adapters (agents, compute, mesh, platform, work). Using it here
+       would mean npm-installing seven d3 packages and running esbuild inside
+       four sync workflows, then inlining ~60-80KB into every landing page — to
+       lay out SIX fixed navigational nodes that never move and carry no live
+       data. That is the wrong trade: it adds a build dependency to a pipeline
+       whose whole virtue is that it is pure static generation.
+       So this is a purpose-built ~4KB renderer that deliberately speaks
+       bead-space's node shape ({id, label, kind, href}), read straight off the
+       rendered DOM. If the strip ever needs live fleet data, swap this for the
+       real bead-space bundle without touching the markup or the CSS.
+
+   PROGRESSIVE ENHANCEMENT, NOT A DEPENDENCY
+       The orbs are real <a> elements emitted in the HTML. Navigation works with
+       JavaScript off, with canvas unsupported, and if this file fails to parse.
+       Everything below only draws the connective tissue between them. Under
+       prefers-reduced-motion it renders the paths once, statically, and stops —
+       it never animates.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  var stage = document.querySelector('.uni-stage');
+  if (!stage) return;
+
+  var canvas = stage.querySelector('.uni-canvas');
+  if (!canvas || typeof canvas.getContext !== 'function') return;
+
+  var ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  var reduced =
+    window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var orbEls = Array.prototype.slice.call(stage.querySelectorAll('.orb'));
+  if (orbEls.length < 2) return;
+
+  var accent =
+    (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '').trim() ||
+    '#2AD7D7';
+
+  var nodes = [];
+  var here = null;
+  var paths = [];
+  var W = 0;
+  var H = 0;
+  var raf = 0;
+
+  // ── layout ───────────────────────────────────────────────────────────────
+  function measure() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var sr = stage.getBoundingClientRect();
+    W = sr.width;
+    H = sr.height;
+    if (W < 2 || H < 2) return false;
+
+    canvas.width = Math.max(1, Math.round(W * dpr));
+    canvas.height = Math.max(1, Math.round(H * dpr));
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    nodes = orbEls.map(function (el) {
+      var r = el.getBoundingClientRect();
+      return {
+        el: el,
+        // bead-space node shape, read off the DOM rather than a second data blob
+        id: el.getAttribute('data-id') || '',
+        kind: el.getAttribute('data-kind') || 'repo',
+        href: el.getAttribute('href') || '',
+        x: r.left - sr.left + r.width / 2,
+        y: r.top - sr.top + r.height / 2,
+        // Paths anchor to the TOP EDGE, not the centre. A quadratic only reaches
+        // half its control-point offset, so centre-anchored arcs peaked inside
+        // the orb row and were covered by the cards (which sit at z-index 1).
+        ty: r.top - sr.top + 5,
+        here: el.classList.contains('here')
+      };
+    });
+
+    here =
+      nodes.filter(function (n) {
+        return n.here;
+      })[0] || nodes[0];
+
+    // One flight path from the lit node to each sibling. The control point is
+    // pushed perpendicular to the chord so paths bow instead of overlapping
+    // into a single straight bar when the orbs wrap onto one row.
+    paths = nodes
+      .filter(function (n) {
+        return n !== here;
+      })
+      .map(function (n, i) {
+        var mx = (here.x + n.x) / 2;
+        var my = (here.ty + n.ty) / 2;
+        var dx = n.x - here.x;
+        var dy = n.ty - here.ty;
+        var len = Math.sqrt(dx * dx + dy * dy) || 1;
+        // Always bow toward the top of the stage (canvas y grows downward), into
+        // the padding band .uni-stage reserves. Alternating the sign put half the
+        // arcs underneath the orb row where they were invisible.
+        var bow = Math.min(78, 26 + len * 0.22) * (dx >= 0 ? -1 : 1);
+        return {
+          a: here,
+          b: n,
+          cx: mx + (-dy / len) * bow,
+          cy: my + (dx / len) * bow,
+          // deterministic offsets: no Math.random, so the strip looks identical
+          // on every load and in every screenshot
+          seeds: [i * 0.37 % 1, (i * 0.37 + 0.5) % 1]
+        };
+      });
+
+    return true;
+  }
+
+  function pointAt(p, t) {
+    var u = 1 - t;
+    return {
+      x: u * u * p.a.x + 2 * u * t * p.cx + t * t * p.b.x,
+      y: u * u * p.a.ty + 2 * u * t * p.cy + t * t * p.b.ty
+    };
+  }
+
+  // ── paint ────────────────────────────────────────────────────────────────
+  function draw(now) {
+    ctx.clearRect(0, 0, W, H);
+
+    for (var i = 0; i < paths.length; i++) {
+      var p = paths[i];
+
+      ctx.globalAlpha = 0.16;
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p.a.x, p.a.ty);
+      ctx.quadraticCurveTo(p.cx, p.cy, p.b.x, p.b.ty);
+      ctx.stroke();
+
+      if (reduced) continue;
+
+      // travellers: small motes drifting out along each path
+      for (var s = 0; s < p.seeds.length; s++) {
+        var t = (p.seeds[s] + now / 7400) % 1;
+        var pt = pointAt(p, t);
+        // fade in and out at the endpoints so motes do not pop
+        var fade = Math.sin(t * Math.PI);
+        ctx.globalAlpha = 0.5 * fade;
+        ctx.fillStyle = accent;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 1.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // the lit node's halo
+    if (here) {
+      ctx.globalAlpha = reduced ? 0.13 : 0.1 + 0.045 * Math.sin(now / 1150);
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(here.x, here.y, 46, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 1;
+  }
+
+  function frame(ts) {
+    draw(ts || 0);
+    raf = window.requestAnimationFrame(frame);
+  }
+
+  function start() {
+    if (!measure()) return;
+    if (raf) window.cancelAnimationFrame(raf);
+    // Paint one frame SYNCHRONOUSLY before scheduling the loop. measure() has
+    // just resized the canvas, which clears it, and requestAnimationFrame does
+    // not fire in a background tab -- so without this the strip renders blank
+    // and only appears once the tab is focused. Measured 2026-08-02: a
+    // backgrounded tab painted 0 pixels indefinitely.
+    draw(0);
+    if (reduced || !window.requestAnimationFrame) return;
+    raf = window.requestAnimationFrame(frame);
+  }
+
+  // Pause when the strip is off-screen or the tab is hidden — a landing page
+  // has no business burning a phone battery on a decoration nobody is looking at.
+  function stop() {
+    if (raf) {
+      window.cancelAnimationFrame(raf);
+      raf = 0;
+    }
+  }
+
+  var visible = true;
+  if (window.IntersectionObserver) {
+    new window.IntersectionObserver(
+      function (entries) {
+        visible = entries[0].isIntersecting;
+        if (visible && !document.hidden) start();
+        else stop();
+      },
+      { threshold: 0.02 }
+    ).observe(stage);
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden || !visible) stop();
+    else start();
+  });
+
+  var resizeTimer = 0;
+  window.addEventListener('resize', function () {
+    window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(start, 140);
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
+  }
+})();
+</script>
+</body>
+</html>
