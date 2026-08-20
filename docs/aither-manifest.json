@@ -1,18 +1,15 @@
 {
   "schemaVersion": "1",
-  "name": "aither-skills",
-  "description": "Portable agent skills — self-contained procedures an agent loads on demand, publishable to any harness.",
-  "url": "https://aitherium.github.io/aither-skills/",
-  "repository": "https://github.com/Aitherium/aither-skills",
+  "name": "awskills",
+  "description": "Portable agent skills — self-contained procedures an agent loads on demand.",
+  "url": "https://aitherium.github.io/awskills/",
+  "repository": "https://github.com/Aitherium/awskills",
   "kind": "corpus",
-  "language": "Markdown",
-  "license": "Apache-2.0",
-  "metrics": {
-    "skills": {
-      "value": 62,
-      "as_of": "2026-08-10T08:33:23Z"
-    }
-  },
-  "generated_at": "2026-08-10T18:24:24Z",
-  "version": "{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/releases/releases#get-the-latest-release\",\"status\":\"404\"}"
+  "status": "public",
+  "adopt": "Copy one .md into your agent's skills dir and tell it to use that skill.",
+  "pairs_with": [
+    "awdk",
+    "awknowledge"
+  ],
+  "includes": []
 }
