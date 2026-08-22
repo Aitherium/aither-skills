@@ -87,7 +87,7 @@ config you'd write by hand if the command isn't available to you.
 `aither` ships with the toolkit — if the command isn't found, install it first:
 
 ```bash
-pip install aither-adk
+pip install awdk
 ```
 
 **Check:** ask OpenClaw *"what MCP tools do you have?"* — it should name AitherOS tools, not
@@ -99,7 +99,7 @@ daemon; MCP servers are connected at startup.
 OpenClaw reads Agent Skills from `~/.openclaw/workspace/skills/<name>/SKILL.md`:
 
 ```bash
-bash scripts/install-aither-skills.sh --target openclaw
+bash scripts/install-awskills.sh --target openclaw
 ```
 
 Or by hand, per skill:
@@ -149,7 +149,7 @@ relevant. Anything procedural belongs in a skill, not in `TOOLS.md`.
 | Symptom | Cause | Fix |
 |---|---|---|
 | Still billing a hosted provider | config didn't take | validate the JSON; confirm `ollama ps` shows a load |
-| `aither: command not found` | toolkit not installed | `pip install aither-adk` |
+| `aither: command not found` | toolkit not installed | `pip install awdk` |
 | Integration ran, no new tools | daemon not restarted | restart the OpenClaw daemon |
 | Skills not visible | wrong layout | must be `<name>/SKILL.md`, not a flat `.md` |
 | Model answers slowly | CPU inference | expected — see [`local-inference`](local-inference.md) |
@@ -157,5 +157,5 @@ relevant. Anything procedural belongs in a skill, not in `TOOLS.md`.
 ## Next
 
 - **[`hermes-agent`](hermes-agent.md)** — the same wiring for Nous Research's Hermes
-- **[`aithernode`](aithernode.md)** — expose this machine's GPU/files to OpenClaw over MCP
+- **[`awnode`](awnode.md)** — expose this machine's GPU/files to OpenClaw over MCP
 - **[`ship-an-app-free`](ship-an-app-free.md)** — have it build and deploy something

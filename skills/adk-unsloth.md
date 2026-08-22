@@ -116,4 +116,4 @@ admin password before the first public launch rather than after.
 
 - `adk-harnesses` — driving Claude Code / Codex / others from your agent
 - `llm-serving` — serving models generally
-- `aither-adk` — the SDK
+- `awdk` — the SDK

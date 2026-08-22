@@ -25,7 +25,7 @@ adk acp config zed            # zed | jetbrains | vscode | neovim
 
 Each emits an ACP `agent.json` whose `runtime.command` runs `adk acp serve`.
 Save it where the editor's ACP integration expects it (e.g. Zed:
-`.zed/agents/aither-adk/agent.json`), then restart the editor.
+`.zed/agents/awdk/agent.json`), then restart the editor.
 
 ## What the editor gets
 

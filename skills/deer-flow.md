@@ -79,7 +79,7 @@ This is also how you give DeerFlow the AitherOS toolset — add the platform MCP
 alongside its built-ins. Get a scoped key rather than reusing a personal one:
 
 ```bash
-pip install aither-adk
+pip install awdk
 adk connect          # writes the gateway URL + a scoped key
 ```
 
@@ -90,7 +90,7 @@ pack drivers include a LangGraph-REST driver precisely so LangGraph-shaped agent
 DeerFlow can be *invoked and supervised*, not merely connected:
 
 ```bash
-pip install aither-adk
+pip install awdk
 adk connect
 ```
 
@@ -126,4 +126,4 @@ a materially different risk from a single supervised turn.
 - **[`local-inference`](local-inference.md)** — the endpoint that makes long runs affordable
 - **[`ods`](ods.md)** — a full local stack to host the model DeerFlow uses
 - **[`tau`](tau.md)** / **[`openclaw`](openclaw.md)** — lighter agents for short tasks
-- **[`aither-adk`](aither-adk.md)** — the toolkit that manages and dispatches
+- **[`awdk`](awdk.md)** — the toolkit that manages and dispatches

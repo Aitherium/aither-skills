@@ -47,7 +47,10 @@ function Invoke-DockerRecovery {
 
     # Phase 2: Shut down WSL (kills the hung Linux VM)
     Write-Host "  [2/5] Shutting down WSL..." -ForegroundColor Yellow
-    wsl --shutdown 2>$null
+    # NOT `wsl --shutdown`: that is GLOBAL and stops EVERY WSL distro on the
+    # machine, including ones unrelated to Docker that may be running real
+    # workloads. Docker only needs its own distros to release their VHDX locks.
+    foreach ($d in 'docker-desktop','docker-desktop-data') { wsl --terminate $d 2>$null }
     Start-Sleep 3
 
     # Phase 3: Kill any remaining zombie processes

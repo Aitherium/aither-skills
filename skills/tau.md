@@ -87,8 +87,8 @@ overrides a user skill of the same name:
 | `<project>/.agents/skills/` | project, shared — highest precedence |
 
 ```bash
-bash scripts/install-aither-skills.sh --target tau             # ~/.tau/skills
-bash scripts/install-aither-skills.sh --target agents-shared   # ~/.agents/skills
+bash scripts/install-awskills.sh --target tau             # ~/.tau/skills
+bash scripts/install-awskills.sh --target agents-shared   # ~/.agents/skills
 ```
 
 > ⚠️ **Tau requires the folder layout and will silently skip anything else.** A skill must be

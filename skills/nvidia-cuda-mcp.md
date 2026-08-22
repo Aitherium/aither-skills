@@ -56,7 +56,7 @@ stripped from a session that launched before the local service was up. A remote 
 like NVIDIA's has no such window — it is either reachable or it 401s, and both are states
 a client retries normally — so plain `http` is correct here.
 
-## aither-adk agents
+## awdk agents
 
 The `nvidia_cuda` tool pack ships with the adk and exposes:
 

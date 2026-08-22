@@ -111,7 +111,7 @@ curl http://127.0.0.1:8788/health          # → {"ok": true, "headroom": "0.25.
 
 # 2) Prove savings on real context (installs headroom-ai in an isolated venv, drives a
 #    realistic coding-agent payload, reports token savings + transforms):
-python AitherOS/scripts/verify_headroom_live.py
+# measure it on a realistic payload before trusting the ratio
 
 # 3) After enabling, watch LLMTraceStore for compression_ratio / tokens_saved per call.
 ```
@@ -119,8 +119,8 @@ python AitherOS/scripts/verify_headroom_live.py
 ## Part of one substrate
 
 headroom is the efficiency wedge under the rest: stand up a box as an
-[AitherNode](aithernode.md), run agents with [aither-adk](aither-adk.md), and every LLM call
+[awnode](awnode.md), run agents with [awdk](awdk.md), and every LLM call
 your agents make gets cheaper without touching a single caller. Local compute is already `$0`;
 this makes cloud calls smaller too.
 
-MIT-licensed, like everything in `aither-skills`. headroom itself is `headroom-ai` on PyPI.
+MIT-licensed, like everything in `awskills`. headroom itself is `headroom-ai` on PyPI.

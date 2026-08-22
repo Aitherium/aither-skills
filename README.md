@@ -1,4 +1,4 @@
-# aither-skills
+# awskills
 
 **Learn to run coding agents at program scale — from measured telemetry, not vibes.**
 Free, MIT-licensed. The operating doctrine, plus 40+ battle-tested skills.
@@ -13,6 +13,42 @@ repos — with agents doing most of the typing. The skills are the parts that su
 
 ---
 
+## 📖 The Developer Codex — start here if you want the whole thing
+
+**[Read it online →](https://aitherium.github.io/awskills/codex.html)** · **[Read it in the repo →](codex/)**
+
+The skills below are procedures. The Codex is the *doctrine underneath them* — what
+makes a codebase run by agents get **harder to break over time** instead of quietly
+rotting while every dashboard stays green.
+
+| | |
+|---|---|
+| **[The path](codex/path/00-what-this-actually-is.md)** — 4 chapters, ~1 hour | Never used a coding agent? From nothing to one real, verified change on your own repository. Then local models, then tools/skills/packs. |
+| **[The eighteen laws](codex/README.md#the-eighteen-laws)** | Every one was a real failure first. Grouped into Enforcement · Silence · Adoption · Deployment · Trust. |
+
+The laws in one line each:
+
+> **Enforcement** — a rule nothing asserts is a suggestion · make it a check, not a
+> ticket · watch your gate fail · mutate the test, not just the code
+>
+> **Silence** — design for the silence · a check that cannot run must not pass · the
+> symptom names the innocent · a checker in the wrong place found nothing · detection
+> without delivery is not detection
+>
+> **Adoption** — a gate that floods gets switched off · open green, ratchet down ·
+> measure it again
+>
+> **Deployment** — written is not deployed · you wrote it, that does not mean it ships ·
+> generate, never copy · the defect lives in the union
+>
+> **Trust** — fail closed, then prove the happy path · never trust the caller for an
+> authorization decision
+
+**Why this exists.** The failures that cost days do not throw. They return 200, render
+correctly, log nothing, and leave the container healthy — a missing thing is
+indistinguishable from a thing nobody wanted. Eighteen laws is what it took to make a
+system able to notice.
+
 ## 🧠 Start here — code like this
 
 | Skill | What it teaches |
@@ -21,9 +57,9 @@ repos — with agents doing most of the typing. The skills are the parts that su
 | [`ramble-driven-development`](skills/ramble-driven-development.md) | **The prompt-shape law.** Median human prompt: **56 characters**. But the 5.9% over 1,000 chars carry **78% of everything typed**. Ramble to load intent, poke to steer, and put the precision in the harness — 90% of machine-written dispatches name a file path against 6% of human ones. Includes how to mine *your* transcripts, and the two filters that otherwise inflate your median by 33x. |
 
 ```bash
-git clone https://github.com/Aitherium/aither-skills
-cd aither-skills
-bash scripts/install-aither-skills.sh          # Windows: pwsh -File scripts/Install-AitherSkills.ps1
+git clone https://github.com/Aitherium/awskills
+cd awskills
+bash scripts/install-awskills.sh          # Windows: pwsh -File scripts/Install-AitherSkills.ps1
 ```
 
 Then tell your agent: **"use the code-like-david skill"**.
@@ -44,9 +80,9 @@ If you have a computer and access to an AI agent, you can run your own agent on 
 hardware, for free, today. Install the pack and open the front door:
 
 ```bash
-git clone https://github.com/Aitherium/aither-skills
-cd aither-skills
-bash scripts/install-aither-skills.sh          # Windows: pwsh -File scripts/Install-AitherSkills.ps1
+git clone https://github.com/Aitherium/awskills
+cd awskills
+bash scripts/install-awskills.sh          # Windows: pwsh -File scripts/Install-AitherSkills.ps1
 ```
 
 Then tell your agent: **"use the aither-start skill"**.
@@ -77,7 +113,8 @@ Then tell your agent: **"use the aither-start skill"**.
 ## Layout
 
 ```
-aither-skills/
+awskills/
+├── codex/      # the Developer Codex — the reading path + the eighteen laws
 ├── skills/     # skill files (.md) — install into any agent, see `install-skills`
 ├── scripts/    # standalone scripts you can run directly
 ├── tools/      # MCP tools / CLI utilities
@@ -91,10 +128,10 @@ slash commands want a flat `.claude/commands/<name>.md`. This repo ships flat fi
 installer converts per target — so you don't have to care:
 
 ```bash
-bash scripts/install-aither-skills.sh --list                 # what's detected
-bash scripts/install-aither-skills.sh --dry-run              # show, write nothing
-bash scripts/install-aither-skills.sh --target openclaw      # just one agent
-bash scripts/install-aither-skills.sh --only local-inference # just one skill
+bash scripts/install-awskills.sh --list                 # what's detected
+bash scripts/install-awskills.sh --dry-run              # show, write nothing
+bash scripts/install-awskills.sh --target openclaw      # just one agent
+bash scripts/install-awskills.sh --only local-inference # just one skill
 ```
 
 Nothing is overwritten without `--force`, so re-running is safe. Full per-agent path table in
@@ -202,7 +239,7 @@ calls just proceed uncompressed), and **agent-callable** tools (`headroom_compre
 ```bash
 export AITHER_HEADROOM_ENABLED=true              # turn on the automatic pre-send hook
 curl http://127.0.0.1:8788/health                # sidecar healthy? → {"ok":true,"headroom":"0.25.0"}
-python AitherOS/scripts/verify_headroom_live.py  # prove savings on a realistic payload
+# prove the savings on a realistic payload before trusting the ratio
 ```
 
 Give an adk agent the tools self-service with `apply_pack_self("headroom")` (free, no entitlement).
@@ -266,7 +303,7 @@ ten-step wiki page.
 [`scripts/omninode-node-up.sh`](scripts/omninode-node-up.sh) takes a fresh machine (Linux / macOS /
 Windows-WSL2) from **nothing installed → a live, discoverable node**: detect hardware → install Rust if
 missing → clone + build `omni-node` → verify two peers discover each other over libp2p/mDNS (or `--listen`
-to run a persistent node). If [aither-adk](https://github.com/Aitherium/aither-adk) is present it can also
+to run a persistent node). If [awdk](https://github.com/Aitherium/awdk) is present it can also
 `adk mesh onboard` the node so your agents use it — one motion, not two projects.
 
 ```bash
@@ -278,7 +315,7 @@ to run a persistent node). If [aither-adk](https://github.com/Aitherium/aither-a
 Verified end-to-end on a 12-core Linux box: clone → build → `NODE OK`, P2P discovery live. See
 [`skills/omninode-node.md`](skills/omninode-node.md). No credentials, no account, no central server.
 
-### 🧩 The Aither substrate — set up and use aither-adk, AitherNode, AitherConnect, AitherZero & AitherMesh
+### 🧩 The Aither substrate — set up and use awdk, AwNode, AitherConnect, AitherZero & AitherMesh
 
 Five skills for the coherent substrate the OmniNode node plugs into. Each is a "set it up, then use
 it" guide grounded in real commands — standing up compute and having your agents use it is one
@@ -286,9 +323,9 @@ motion, not five projects.
 
 | Skill | What it sets up |
 |-------|-----------------|
-| [`aither-adk`](skills/aither-adk.md) | The agent toolkit — `pip install aither-adk` → `adk onboard --quick` → `adk run`. Your model, your loop, your data on your box; manage from the portal. |
-| [`aither-discord-agent`](skills/aither-discord-agent.md) | Deploy any aither-adk agent as a **Discord bot** with one automated onboarding command — `adk onboard --discord` installs your pack, validates the bot token live, prints the invite link, verifies identity/tools, and launches. Every DM/@mention runs your agent's own loop. No paid tier needed (hand-rolled fallback). |
-| [`aithernode`](skills/aithernode.md) | The *body* — a local MCP server (`adk mcp node`) exposing GPU, local inference, ComfyUI, and files to agents; or bootstrap the box as a full inference node. |
+| [`awdk`](skills/awdk.md) | The agent toolkit — `pip install awdk` → `adk onboard --quick` → `adk run`. Your model, your loop, your data on your box; manage from the portal. |
+| [`aither-discord-agent`](skills/aither-discord-agent.md) | Deploy any awdk agent as a **Discord bot** with one automated onboarding command — `adk onboard --discord` installs your pack, validates the bot token live, prints the invite link, verifies identity/tools, and launches. Every DM/@mention runs your agent's own loop. No paid tier needed (hand-rolled fallback). |
+| [`awnode`](skills/awnode.md) | The *body* — a local MCP server (`adk mcp node`) exposing GPU, local inference, ComfyUI, and files to agents; or bootstrap the box as a full inference node. |
 | [`aitherconnect`](skills/aitherconnect.md) | The seam — `adk connect` / `adk mesh onboard` (`--headscale` behind NAT) to wire a machine, agent, and browser into AitherOS and the mesh. |
 | [`aitherzero`](skills/aitherzero.md) | The provisioner — one `config.psd1` + `bootstrap.ps1` to stand up bare-metal/on-prem/cloud/hybrid, with a generated-from-inventory config editor and `az_*` agent tools. |
 | [`aithermesh`](skills/aithermesh.md) | The fabric — one playbook (`Invoke-AitherPlaybook deploy-mesh-agent`) to create a private WireGuard mesh, join nodes to the overlay, and deploy agents onto them; nodes defined in `config/nodes.yaml`. |
@@ -344,32 +381,6 @@ More agent-ops glue is on the way. Star the repo to follow along — and PRs/iss
 ## License
 
 [MIT](./LICENSE) © Aitherium. Use it, fork it, ship it.
-
-<!-- aitherium-ecosystem:start -->
-## Aitherium open-source ecosystem
-
-This repo is one piece of a connected set. All public, MIT/BSL-licensed:
-
-| repo | what it is | pages |
-|---|---|---|
-| [awrecover](https://github.com/Aitherium/awrecover) | Labelled snapshots with an all-or-nothing restore | [docs](https://aitherium.github.io/awrecover/) |
-| [awshare](https://github.com/Aitherium/awshare) | Publish an artifact and fetch it back verified | [docs](https://aitherium.github.io/awshare/) |
-| [awseal](https://github.com/Aitherium/awseal) | Sign an artifact so a stranger can verify it | [docs](https://aitherium.github.io/awseal/) |
-| [awnode](https://github.com/Aitherium/awnode) | Lightweight local gateway — your apps to backends you chose | [docs](https://aitherium.github.io/awnode/) |
-| [awnix](https://github.com/Aitherium/awnix) | A bootable, immutable Linux base for agent-run machines | [docs](https://aitherium.github.io/awnix/) |
-| [awdk](https://github.com/Aitherium/awdk) | Build AI agent fleets — 3 lines, any backend | [docs](https://aitherium.github.io/awdk/) |
-| [awskills](https://github.com/Aitherium/awskills) | Free agent skills, scripts & automations | [docs](https://aitherium.github.io/awskills/) |
-| [AitherZero](https://github.com/Aitherium/AitherZero) | PowerShell 7+ automation framework | [docs](https://aitherium.github.io/AitherZero/) |
-| [awgit](https://github.com/Aitherium/awgit) | Semantic version control on top of git | [docs](https://aitherium.github.io/awgit/) |
-| [awgraph](https://github.com/Aitherium/awgraph) | Code knowledge graph for AI agents | [docs](https://aitherium.github.io/awgraph/) |
-| [aitherkvcache](https://github.com/Aitherium/aitherkvcache) | Near-optimal KV cache quantization | [docs](https://aitherium.github.io/aitherkvcache/) |
-| [awrelay](https://github.com/Aitherium/awrelay) | Agent-to-agent messaging over any chat server | [docs](https://aitherium.github.io/awrelay/) |
-| [awm](https://github.com/Aitherium/awm) | A small world model (LeWM JEPA + MLP) to bootstrap your own | [docs](https://aitherium.github.io/awm/) |
-| [AitherConnect](https://github.com/Aitherium/AitherConnect) | Browser extension: federated AI search & desktop bridge | — |
-| [homebrew-tap](https://github.com/Aitherium/homebrew-tap) | `brew tap aitherium/tap` | — |
-
-Built by [Aitherium](https://aitherium.com).
-<!-- aitherium-ecosystem:end -->
 
 <!-- aither-ecosystem:start GENERATED from the ecosystem registry. Edits here are overwritten; change the registry instead. -->
 
@@ -432,7 +443,6 @@ Every repository here is public. Each publishes an `aither-manifest.json` beside
 | [awmail](https://github.com/Aitherium/awmail) | Give an agent an email address — send, and actually receive | [docs](https://aitherium.github.io/awmail/) |
 | [awfind](https://github.com/Aitherium/awfind) | A portable search client — query, results, ranking | [docs](https://aitherium.github.io/awfind/) |
 | [awbrowse](https://github.com/Aitherium/awbrowse) | A portable browser client — navigate, console, network, DOM, screenshot | [docs](https://aitherium.github.io/awbrowse/) |
-| [awknowledge](https://github.com/Aitherium/awknowledge) | How to run a coding agent so the result survives — the laws, with evidence | — |
 | [aitherkvcache](https://github.com/Aitherium/aitherkvcache) | Near-optimal KV cache quantization for LLM inference — sub-byte compression | [docs](https://aitherium.github.io/aitherkvcache/) |
 | [AitherZero](https://github.com/Aitherium/AitherZero) | PowerShell 7+ automation framework — numbered, self-describing scripts | [docs](https://aitherium.github.io/AitherZero/) |
 | [AitherConnect](https://github.com/Aitherium/AitherConnect) | Browser extension — federated AI search, page context, and the Living OS overlay | [docs](https://aitherium.github.io/AitherConnect/) |

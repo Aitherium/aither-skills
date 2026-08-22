@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Run any aither-adk agent as a self-service Discord bot.
+"""Run any awdk agent as a self-service Discord bot.
 
 > **Automated path:** `adk onboard --discord --identity <name>` does all of this
 > in one command (validates the token live, prints the invite link, launches).
-> This standalone launcher is the equivalent for older aither-adk, or for
+> This standalone launcher is the equivalent for older awdk, or for
 > running the bot directly.
 
 Loads an agent identity (and your installed agent packs), wires every DM and
@@ -17,13 +17,14 @@ Discord. Two client paths:
 
 Run:
 
+    pip install 'awdk[channels]'        # the agent toolkit + discord.py
     pip install 'aither-adk[channels]'        # the agent toolkit + discord.py
-    adk install pack:jgames-repair            # or any pack you've installed
-    DISCORD_BOT_TOKEN=<token> python discord-agent-bot.py --identity jgames
+    adk install pack:<your-pack>              # any pack you have installed
+    DISCORD_BOT_TOKEN=<token> python discord-agent-bot.py --identity <your-identity>
 
 Before connecting, prove the setup can fail honestly:
 
-    python discord-agent-bot.py --check --identity jgames
+    python discord-agent-bot.py --check --identity <your-identity>
 
 Behavior lives in your pack: ``identity.yaml`` (persona/will/personality),
 ``skills/``, and your registered tools. Re-run the bot to apply changes.
@@ -71,7 +72,7 @@ def build_agent(identity: str, tools_module: str | None = None):
 
     if tools_module:
         # Import the module so its ``@tool``-decorated functions register into
-        # aither-adk's global tool registry (same pattern as a pack's tools/).
+        # awdk's global tool registry (same pattern as a pack's tools/).
         importlib.import_module(tools_module)
     tools = [get_global_registry()] if get_global_registry().list_tools() else None
     return AitherAgent(identity, tools=tools, load_packs=True)
@@ -94,7 +95,7 @@ def make_discord_client(agent):
     try:
         import discord
     except ImportError as exc:  # pragma: no cover
-        raise RuntimeError("discord.py required: pip install 'aither-adk[channels]'") from exc
+        raise RuntimeError("discord.py required: pip install 'awdk[channels]'") from exc
 
     class _Client(discord.Client):
         async def on_ready(self) -> None:
@@ -124,7 +125,7 @@ def make_discord_client(agent):
 
 
 async def try_builtin_adapter(token: str, agent) -> bool:
-    """Start aither-adk's ``DiscordAdapter`` if available + entitled."""
+    """Start awdk's ``DiscordAdapter`` if available + entitled."""
     try:
         from adk.channels import DiscordAdapter
 
@@ -137,7 +138,7 @@ async def try_builtin_adapter(token: str, agent) -> bool:
         return False
 
     await adapter.start()
-    print("  running on aither-adk's DiscordAdapter (channels capability)")
+    print("  running on awdk's DiscordAdapter (channels capability)")
     return True
 
 
@@ -201,7 +202,7 @@ def main() -> int:
         print("✗ DISCORD_BOT_TOKEN is required (or pass --token).", file=sys.stderr)
         return 1
 
-    print("Deploy your aither-adk agent as a Discord bot")
+    print("Deploy your awdk agent as a Discord bot")
     print(f"  identity: {args.identity}")
     try:
         agent = build_agent(args.identity, args.tools_module)

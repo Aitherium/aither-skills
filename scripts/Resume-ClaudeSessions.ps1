@@ -160,7 +160,10 @@ param(
     [switch]$IncludeLive,
     [switch]$IncludeMissing,
     [string]$ExcludeSession,
-    [switch]$DryRun
+    [switch]$DryRun,
+
+    # Prove the liveness detector can still both PASS and FAIL. See the block below.
+    [switch]$SelfTest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -189,7 +192,7 @@ function Get-LiveClaudeSessions {
        Identity is proven by procStart — the process's local StartTime.Ticks
        (verified live 2026-07-26, delta 7 ticks) — NOT by the process NAME.
        Gating on `Get-Process -Name claude` was a Windows-only assumption
-       (D-1327): anywhere Claude Code runs under `node` or a wrapper, that
+       anywhere Claude Code runs under `node` or a wrapper, that
        lookup returns nothing, every session reads as dead, `-Snapshot` finds
        "no live sessions", and the anti-shrink guard then preserves a stale
        snapshot — silently capturing NOTHING while looking healthy. A pid+start
@@ -231,7 +234,7 @@ function Get-LiveClaudeSessions {
             # snapshot was therefore never written, and the anti-shrink guard
             # faithfully preserved a 4-day-old snapshot of 7 sessions — so a
             # post-reboot -Restore would have reopened the WRONG SET, silently.
-            # This is the exact failure mode the D-1327 comment above warns about,
+            # This is the exact failure mode the comment above warns about,
             # arriving through a different door: the evidence was not missing, it
             # was being read in the wrong unit.
             #
@@ -293,7 +296,7 @@ function Get-StaleClaudeSessions {
     foreach ($f in @(Get-ChildItem -LiteralPath $SessionsDir -Filter '*.json' -File -ErrorAction SilentlyContinue)) {
         try { $o = Get-Content -LiteralPath $f.FullName -Raw -ErrorAction Stop | ConvertFrom-Json } catch { continue }
         if (-not $o.sessionId -or -not $o.pid) { continue }
-        # Name-agnostic, same reasoning as Get-LiveClaudeSessions (D-1327): a pid
+        # Name-agnostic, same reasoning as Get-LiveClaudeSessions: a pid
         # that still resolves means the process is running, whatever it is called.
         if (Get-Process -Id ([int]$o.pid) -ErrorAction SilentlyContinue) { continue }  # still running: not stale
         if ($o.kind -and $o.kind -ne 'interactive') { continue }
@@ -450,6 +453,81 @@ function Expand-Selection {
         }
     }
     $out | Where-Object { $_ -ge 1 -and $_ -le $Count } | Select-Object -Unique
+}
+
+# --- Self-test --------------------------------------------------------------
+# Everything this script decides rests on ONE question — is that pid still the
+# process the state file describes? — and that question was answered WRONG for
+# every session on this box for as long as procStart's CLOCK disagreed with the
+# reader's (measured twice: 19 sessions on 2026-08-09, and again on a stale fork
+# of this script on 2026-08-17). Nothing noticed either time, because the wrong
+# answer is "dead" -- and a dead session is indistinguishable from a session you
+# never had. The dual-clock comparison above is the fix; this is the thing that
+# would have CAUGHT it, exercised against the REAL process table.
+if ($SelfTest) {
+    $fails = @()
+    $me    = Get-Process -Id $PID
+    $st    = $me.StartTime
+    $tmp   = Join-Path ([IO.Path]::GetTempPath()) ("aitherresume-selftest-" + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+
+    function New-StateFile([string]$dir, [int]$procId, [string]$sid, $claim, [string]$kind) {
+        $o = [ordered]@{ pid = $procId; sessionId = $sid; cwd = (Get-Location).Path
+                         name = "selftest-$sid"; kind = $kind; entrypoint = 'cli'; status = 'idle' }
+        if ($null -ne $claim) { $o.procStart = [string]$claim }
+        $o | ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $dir "$procId.json") -Encoding utf8
+    }
+
+    # A dead pid to prove the detector still rejects one. Take a pid nothing owns.
+    $deadPid = 1..65535 | Where-Object { -not (Get-Process -Id $_ -ErrorAction SilentlyContinue) } | Select-Object -First 1
+
+    $cases = @(
+        @{ n = 'FILETIME procStart (Claude Code >= 2.1.234) reads LIVE'
+           f = { New-StateFile $tmp $PID 'sid-filetime' $st.ToFileTime() 'interactive' }; want = $true;  id = 'sid-filetime' }
+        @{ n = 'DateTime.Ticks procStart (older writers) still reads LIVE'
+           f = { New-StateFile $tmp $PID 'sid-ticks'    $st.Ticks       'interactive' }; want = $true;  id = 'sid-ticks' }
+        @{ n = 'procStart 60s off the real start is REJECTED (pid recycled)'
+           f = { New-StateFile $tmp $PID 'sid-wrong'    ($st.ToFileTime() + 600000000L) 'interactive' }; want = $false; id = 'sid-wrong' }
+        @{ n = 'dead pid is REJECTED'
+           f = { New-StateFile $tmp $deadPid 'sid-dead' $st.ToFileTime() 'interactive' }; want = $false; id = 'sid-dead' }
+    )
+    foreach ($c in $cases) {
+        Get-ChildItem -LiteralPath $tmp -Filter *.json -File | Remove-Item -Force
+        & $c.f
+        $got = (Get-LiveClaudeSessions -SessionsDir $tmp).ContainsKey($c.id)
+        if ($got -ne $c.want) { $fails += "$($c.n) -- expected live=$($c.want), got $got" }
+        else { Write-Host ("  ok   " + $c.n) -ForegroundColor DarkGray }
+    }
+
+    # kind must SURVIVE to the caller: the bg skip is keyed on it, and a null
+    # would silently turn "cannot resume" back into "resume and lose the tab".
+    Get-ChildItem -LiteralPath $tmp -Filter *.json -File | Remove-Item -Force
+    New-StateFile $tmp $PID 'sid-bg' $st.ToFileTime() 'bg'
+    $k = (Get-LiveClaudeSessions -SessionsDir $tmp)['sid-bg'].Kind
+    if ($k -ne 'bg') { $fails += "kind is not carried through (got '$k', want 'bg')" }
+    else { Write-Host '  ok   background agent surfaces as kind=bg' -ForegroundColor DarkGray }
+
+    # MUTATION GUARD. The three cases above pass under the OLD, broken comparison
+    # too if the writer happens to use Ticks -- so without this the suite could go
+    # green while the real defect sat there. Assert that the pre-fix arithmetic
+    # really does reject a FILETIME claim: if this ever stops being true, the
+    # cases above are no longer testing anything and must be rewritten.
+    $preFixDelta = [Math]::Abs($st.ToFileTime() - $st.Ticks)
+    if ($preFixDelta -le 100000000L) {
+        $fails += "mutation guard vacuous: the two epochs now agree ($preFixDelta ticks apart), so these cases no longer reproduce the two-clock defect these cases exist for"
+    } else {
+        Write-Host ("  ok   mutation guard: Ticks-only comparison still rejects a FILETIME claim (delta $preFixDelta)") -ForegroundColor DarkGray
+    }
+
+    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host ''
+    if ($fails.Count) {
+        foreach ($f in $fails) { Write-Host ("  FAIL " + $f) -ForegroundColor Red }
+        Write-Host ("  self-test FAILED ({0})" -f $fails.Count) -ForegroundColor Red
+        exit 1
+    }
+    Write-Host '  self-test OK' -ForegroundColor Green
+    exit 0
 }
 
 # --- Live sessions (ground truth, see Get-LiveClaudeSessions) ---------------
@@ -717,6 +795,14 @@ foreach ($s in $sessions) {
     $l = if ($liveMap.ContainsKey($s.Id)) { $liveMap[$s.Id] } else { $null }
     $s | Add-Member -NotePropertyName Live     -NotePropertyValue ([bool]$l)                              -Force
     $s | Add-Member -NotePropertyName LiveName -NotePropertyValue $(if ($l) { $l.Name } else { $null })   -Force
+    # kind="bg" is a BACKGROUND AGENT, not a window. Claude Code REFUSES to resume
+    # one ("... is currently running as a background agent. Use `claude agents` to
+    # find and attach to it, or add --fork-session to branch off a copy") and exits.
+    # This script cannot see that refusal -- it launches a tab and reports success --
+    # so the caller is told a session reopened when nothing did. Measured 2026-08-17
+    # on a 29h-old bg agent that `live` alone would have marked resumable.
+    $s | Add-Member -NotePropertyName LiveKind -NotePropertyValue $(if ($l) { $l.Kind } else { $null })   -Force
+    $s | Add-Member -NotePropertyName IsBg     -NotePropertyValue ([bool]($l -and $l.Kind -eq 'bg'))     -Force
 }
 
 # --- JSON mode (for /resume-all and tooling) --------------------------------
@@ -735,6 +821,8 @@ if ($Json) {
             age        = (Format-Age $_.When).Trim()
             live       = $_.Live       # open in another window RIGHT NOW — resuming duplicates it
             name       = $_.LiveName   # Claude's own name for the live process, e.g. aitheros-fresh-68
+            kind       = $_.LiveKind   # "interactive" | "bg" | null
+            attachOnly = $_.IsBg       # bg agent: ATTACH (`claude agents`) or --fork-session; a resume is refused
         }
     } | ConvertTo-Json -Depth 4
     exit 0
@@ -754,7 +842,8 @@ function Show-Table {
         if ($title.Length -gt 34) { $title = $title.Substring(0, 33) + '…' }
         $title  = '{0,-34}' -f $title
         $branch = if ($s.Branch) { " ($($s.Branch))" } else { '' }
-        $liveTag = if ($s.Live) { (C '1;35' '  ⚡ live') } else { '' }
+        $liveTag = if ($s.IsBg)   { (C '1;35' '  🤖 bg agent — attach, cannot resume') }
+                   elseif ($s.Live) { (C '1;35' '  ⚡ live') } else { '' }
         Write-Host ("  " + (C '1;33' $n) + "  " + (C '90' $age) + "  " + (C '1;37' $title) + (C '36' $branch) + $liveTag)
         Write-Host ("        " + (C '90' $s.Cwd))
         if ($s.LastPrompt) {
@@ -777,17 +866,40 @@ $chosenIdx = @()
 # between the two calls and index N silently becomes a different session. Observed
 # live, two invocations seconds apart. Ids are stable; positions are not.
 if ($selectedById) {
-    $chosen = $selectedById
+    # An explicit id is a deliberate choice, so LIVE ones are not filtered here --
+    # but a background agent is not a choice this script can honour at all: Claude
+    # Code refuses the resume and exits, so the tab dies while this script prints
+    # "Resuming ..." and returns 0. Drop it and name the two things that DO work.
+    $bgNamed = @($selectedById | Where-Object { $_.IsBg })
+    foreach ($b in $bgNamed) {
+        Write-Host (C '1;33' "  '$($b.Title)' is a background agent — not resumable.")
+        Write-Host (C '90'   "    attach:  claude agents            (id $($b.Id))")
+        Write-Host (C '90'   "    or fork:  claude --resume $($b.Id) --fork-session")
+    }
+    $chosen = @($selectedById | Where-Object { -not $_.IsBg })
+    if ($chosen.Count -eq 0) {
+        Write-Host (C '1;33' '  Nothing left to resume.')
+        exit 3
+    }
 }
 elseif ($All) {
     Show-Table
     # "all" means "everything that is NOT already on screen somewhere". Resuming a
     # live session opens a second view of one conversation, which is never what
     # a bulk resume meant.
-    $chosenIdx = @(1..$sessions.Count | Where-Object { $IncludeLive -or -not $sessions[$_ - 1].Live })
-    $skipped = $sessions.Count - $chosenIdx.Count
+    # A bg agent is skipped even under -IncludeLive: that switch exists to allow a
+    # deliberate SECOND VIEW of a conversation, and there is no second view to be had
+    # here -- Claude Code declines the resume outright.
+    $chosenIdx = @(1..$sessions.Count | Where-Object {
+        (-not $sessions[$_ - 1].IsBg) -and ($IncludeLive -or -not $sessions[$_ - 1].Live)
+    })
+    $bg = @($sessions | Where-Object { $_.IsBg })
+    $skipped = $sessions.Count - $chosenIdx.Count - $bg.Count
     if ($skipped -gt 0) {
         Write-Host (C '1;33' "  Skipping $skipped session(s) already open (-IncludeLive to resume them anyway).")
+    }
+    foreach ($b in $bg) {
+        Write-Host (C '1;33' "  Skipping background agent '$($b.Title)' — attach with ``claude agents``, or resume with --fork-session to branch a copy.")
     }
 } elseif ($Select) {
     $chosenIdx = Expand-Selection -Spec $Select -Count $sessions.Count

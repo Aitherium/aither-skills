@@ -29,6 +29,7 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEBT_HOOK = os.path.join(HERE, "stop_debt_ledger.py")
 LIVE_HOOK = os.path.join(HERE, "stop_live_proof.py")
+AUTO_HOOK = os.path.join(HERE, "stop_automation_gap.py")
 
 
 # ------------------------------------------------------------------ transcripts
@@ -83,8 +84,12 @@ def invoke(hook: str, entries: list[dict], *, stop_hook_active: bool = False, en
         }
         child_env = dict(os.environ)
         # Do not let the developer's own configuration change the answers.
-        for key in ("DEBT_LEDGER", "DEBT_LEDGER_IGNORE", "LIVE_PROOF_EVIDENCE"):
+        for key in ("DEBT_LEDGER", "DEBT_LEDGER_IGNORE", "LIVE_PROOF_EVIDENCE",
+                    "AUTOMATION_BACKLOG", "AUTOMATION_GAP_REPEAT", "AUTOMATION_GAP_CHAIN",
+                    "AUTOMATION_GAP_SESSIONS", "AUTOMATION_GAP_MAX_BLOCKS",
+                    "AUTOMATION_GAP_OFF"):
             child_env.pop(key, None)
+        child_env["CLAUDE_PROJECT_DIR"] = tmp
         child_env.update(env or {})
         proc = subprocess.run(
             [sys.executable, hook],
@@ -400,6 +405,150 @@ def _(fn=None):
             [user("fix the auth gate"), assistant("Fixed.", [edit("src/authz.py")])],
             stop_hook_active=True,
         )
+    )
+
+
+# --- automation gap ----------------------------------------------------------
+
+
+def backlog(tmp_marker: str) -> dict:
+    """An env pointing the gate at a backlog file written on the fly."""
+    return {"AUTOMATION_BACKLOG": tmp_marker}
+
+
+@case("automation: same mutation 3x, nothing recorded -> BLOCK")
+def _(fn=None):
+    """The whole point of the gate: a loop typed out by hand."""
+    expect_block(
+        invoke(AUTO_HOOK, [
+            user("restart the web tier"),
+            assistant("", [run("docker restart web-1")]),
+            assistant("", [run("docker restart web-2")]),
+            assistant("All three back up.", [run("docker restart web-3")]),
+        ]),
+        must_mention="docker restart",
+    )
+
+
+@case("automation: a hand-typed mutating chain -> BLOCK")
+def _(fn=None):
+    expect_block(
+        invoke(AUTO_HOOK, [
+            user("rebuild the container"),
+            assistant("Done.", [run(
+                "docker stop api && docker rm api && docker run --name api img "
+                "&& systemctl status api")]),
+        ]),
+        must_mention="AT002",
+    )
+
+
+@case("automation: repeated READS are exploration -> allow")
+def _(fn=None):
+    """Automating a debugging loop would be noise; a rule that floods gets switched off."""
+    expect_allow(
+        invoke(AUTO_HOOK, [
+            user("why is it down?"),
+            assistant("", [run("docker ps")]),
+            assistant("", [run("docker ps -a")]),
+            assistant("Nothing running.", [run("docker ps | grep api")]),
+        ])
+    )
+
+
+@case("automation: ordinary dev flow -> allow")
+def _(fn=None):
+    expect_allow(
+        invoke(AUTO_HOOK, [
+            user("land the fix"),
+            assistant("", [run("pytest -x")]),
+            assistant("", [run("pytest -x")]),
+            assistant("", [run("pytest -x")]),
+            assistant("Green.", [run("git commit -m fix")]),
+        ])
+    )
+
+
+@case("automation: running an EXISTING script -> allow")
+def _(fn=None):
+    """Running automation is the outcome this gate exists to produce."""
+    expect_allow(
+        invoke(AUTO_HOOK, [
+            user("deploy"),
+            assistant("", [run("./deploy.sh staging")]),
+            assistant("", [run("./deploy.sh canary")]),
+            assistant("Shipped.", [run("./deploy.sh prod")]),
+        ])
+    )
+
+
+@case("automation: inline one-off analysis -> allow")
+def _(fn=None):
+    """A signature cannot say WHICH analysis it was, so these are counted, not judged."""
+    expect_allow(
+        invoke(AUTO_HOOK, [
+            user("how many rows?"),
+            assistant("", [run("python -c 'import json;print(1)'")]),
+            assistant("", [run("python -c 'import json;print(2)'")]),
+            assistant("About 40k.", [run("python -c 'import json;print(3)'")]),
+        ])
+    )
+
+
+@case("automation: ran no commands at all -> allow")
+def _(fn=None):
+    expect_allow(
+        invoke(AUTO_HOOK, [user("what does this do?"), assistant("It parses the config.")])
+    )
+
+
+@case("automation: a recorded wontfix discharges the shape -> allow")
+def _(fn=None):
+    """The escape hatch, and it is durable — the next session does not re-ask."""
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "backlog.yaml")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("version: 1\nentries:\n"
+                     "  - signature: 'docker restart'\n    status: wontfix\n"
+                     "    reason: one-off during an incident\n")
+        expect_allow(
+            invoke(AUTO_HOOK, [
+                user("restart the web tier"),
+                assistant("", [run("docker restart web-1")]),
+                assistant("", [run("docker restart web-2")]),
+                assistant("Back up.", [run("docker restart web-3")]),
+            ], env=backlog(path))
+        )
+
+
+@case("automation: an `open` row is not a decision -> BLOCK")
+def _(fn=None):
+    """`open` means found, not answered. Only automated/wontfix discharge."""
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "backlog.yaml")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("version: 1\nentries:\n"
+                     "  - signature: 'docker restart'\n    status: open\n")
+        expect_block(
+            invoke(AUTO_HOOK, [
+                user("restart the web tier"),
+                assistant("", [run("docker restart web-1")]),
+                assistant("", [run("docker restart web-2")]),
+                assistant("Back up.", [run("docker restart web-3")]),
+            ], env=backlog(path)),
+            must_mention="docker restart",
+        )
+
+
+@case("automation: AUTOMATION_GAP_OFF disables it -> allow")
+def _(fn=None):
+    expect_allow(
+        invoke(AUTO_HOOK, [
+            user("restart the web tier"),
+            assistant("", [run("docker restart web-1")]),
+            assistant("", [run("docker restart web-2")]),
+            assistant("Back up.", [run("docker restart web-3")]),
+        ], env={"AUTOMATION_GAP_OFF": "1"})
     )
 
 

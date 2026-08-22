@@ -6,7 +6,7 @@ allowed-tools: Bash(pwsh:*)
 
 You are helping the user resume their previously-killed Claude Code sessions.
 
-The engine is `scripts/Resume-ClaudeSessions.ps1` from the `aither-skills` repo.
+The engine is `scripts/Resume-ClaudeSessions.ps1` from the `awskills` repo.
 Replace `<ENGINE>` below with wherever you saved it. It is read-only against the
 session history — it never mutates the journals.
 

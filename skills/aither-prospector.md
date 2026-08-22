@@ -70,4 +70,4 @@ On a large repo that's the difference between one focused pass and scanning the 
 
 Prospector is the *where*, [CodeGraph](aither-codegraph.md) is the *what*, and
 [graph-rag-agent](graph-rag-agent.md) is knowledge over your docs — three layers of the same
-[aither-adk](aither-adk.md) agent. MIT-licensed, like everything in `aither-skills`.
+[awdk](awdk.md) agent. MIT-licensed, like everything in `awskills`.

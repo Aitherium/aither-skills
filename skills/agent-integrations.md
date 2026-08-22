@@ -1,6 +1,6 @@
 ---
 name: agent-integrations
-description: Integrate aither-adk and AitherOS with mainstream coding agent harnesses (Claude Code, Cursor, Aider, Cline, Codex, Hermes, Roo Code) — both as a CLIENT of cloud providers (OpenRouter, DeepSeek, Anthropic, Moonshot) and as a BACKEND that other agents can use. Two-way integration.
+description: Integrate awdk and AitherOS with mainstream coding agent harnesses (Claude Code, Cursor, Aider, Cline, Codex, Hermes, Roo Code) — both as a CLIENT of cloud providers (OpenRouter, DeepSeek, Anthropic, Moonshot) and as a BACKEND that other agents can use. Two-way integration.
 ---
 
 # agent-integrations — aither talks to everything, everything talks to aither
@@ -102,14 +102,14 @@ Works with: any agent, anywhere, with ACTA billing.
 
 ---
 
-## Adding a new provider to aither-adk
+## Adding a new provider to awdk
 
 ### Native (Anthropic protocol — best, no bridge)
 
 If the provider speaks Anthropic Messages API natively:
 
 ```yaml
-# In AitherOS/config/claude_profiles.yaml:
+# In your claude_profiles.yaml:
 my-provider:
   transport: native
   description: "My Provider (native Anthropic)"
@@ -127,7 +127,7 @@ my-provider:
 If the provider speaks OpenAI `/v1/chat/completions`:
 
 ```yaml
-# In AitherOS/config/claude_bridge.yaml, add backend:
+# In your claude_bridge.yaml, add backend:
 my_provider:
   base_url: https://api.myprovider.com/v1
   api_key_secret: MY_PROVIDER_API_KEY

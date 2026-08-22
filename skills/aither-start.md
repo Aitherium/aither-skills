@@ -55,7 +55,7 @@ nvidia-smi --query-gpu=name,memory.total --format=csv 2>/dev/null || echo "no NV
 ## Step 1 — install the toolkit
 
 ```bash
-pip install aither-adk
+pip install awdk
 adk onboard --quick
 ```
 
@@ -93,9 +93,9 @@ picked a model too big for your memory. Drop to `qwen3:4b`, or `gemma3:1b` on a 
 One command, and your agent gains every skill in this repo:
 
 ```bash
-git clone https://github.com/Aitherium/aither-skills
-cd aither-skills
-bash scripts/install-aither-skills.sh          # Windows: pwsh -File scripts/Install-AitherSkills.ps1
+git clone https://github.com/Aitherium/awskills
+cd awskills
+bash scripts/install-awskills.sh          # Windows: pwsh -File scripts/Install-AitherSkills.ps1
 ```
 
 It detects which agents you have and installs in each one's native format. See
@@ -128,12 +128,12 @@ You now have an agent that can run code. Use it:
   tiers only. No credit card, no server to rent.
 - **[`graph-rag-agent`](graph-rag-agent.md)** — point it at your own documents and ask questions
   that get answered from *your* material.
-- **[`aither-adk`](aither-adk.md)** — the full toolkit: agent packs, memory, tools.
+- **[`awdk`](awdk.md)** — the full toolkit: agent packs, memory, tools.
 
 ## Step 6 — optional: let others use your spare compute
 
 If your machine has a GPU that idles, it can serve inference to the mesh and earn settlement
-for it: **[`omninode-node`](omninode-node.md)** and **[`aithernode`](aithernode.md)**. Entirely
+for it: **[`omninode-node`](omninode-node.md)** and **[`awnode`](awnode.md)**. Entirely
 optional and off by default — nothing joins a network unless you run the command.
 
 ---

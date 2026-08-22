@@ -78,9 +78,9 @@ systemctl --user daemon-reload && systemctl --user enable --now bonsai-llama
 
 ## Part of one substrate
 
-A Bonsai box is a cheap always-on reasoning [AitherNode](aithernode.md); join it to a fleet with
-[AitherMesh](aithermesh.md), point [aither-adk](aither-adk.md) agents at its `:8090/v1` endpoint, and
+A Bonsai box is a cheap always-on reasoning [awnode](awnode.md); join it to a fleet with
+[AitherMesh](aithermesh.md), point [awdk](awdk.md) agents at its `:8090/v1` endpoint, and
 provision the host with [AitherZero](aitherzero.md).
 
 Model + fork © **PrismML** — <https://huggingface.co/prism-ml/Bonsai-27B-gguf>. This skill is
-MIT-licensed, like everything in `aither-skills`.
+MIT-licensed, like everything in `awskills`.
