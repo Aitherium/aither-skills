@@ -38,9 +38,9 @@ that need it — you do not have to do that by hand.
 ## The one-command install
 
 ```bash
-git clone https://github.com/Aitherium/aither-skills
-cd aither-skills
-bash scripts/install-aither-skills.sh            # macOS / Linux / WSL
+git clone https://github.com/Aitherium/awskills
+cd awskills
+bash scripts/install-awskills.sh            # macOS / Linux / WSL
 pwsh -File scripts/Install-AitherSkills.ps1      # Windows PowerShell
 ```
 
@@ -48,10 +48,10 @@ It detects every agent installed on the machine, installs into each one's native
 prints exactly what it wrote where. Useful flags:
 
 ```bash
-bash scripts/install-aither-skills.sh --dry-run          # show, write nothing
-bash scripts/install-aither-skills.sh --target openclaw  # just one agent
-bash scripts/install-aither-skills.sh --list             # what would be detected
-bash scripts/install-aither-skills.sh --only local-inference,ship-an-app-free
+bash scripts/install-awskills.sh --dry-run          # show, write nothing
+bash scripts/install-awskills.sh --target openclaw  # just one agent
+bash scripts/install-awskills.sh --list             # what would be detected
+bash scripts/install-awskills.sh --only local-inference,ship-an-app-free
 ```
 
 **Nothing is overwritten without `--force`.** An existing skill of the same name is reported
@@ -154,5 +154,5 @@ the platform toolset — connect an MCP server too:
 
 - **[`openclaw`](openclaw.md)** — `aither integrate openclaw`, automated
 - **[`hermes-agent`](hermes-agent.md)** — merge one config block
-- **[`aithernode`](aithernode.md)** — expose this machine's hardware to any MCP-capable agent
-- **[`aither-adk`](aither-adk.md)** — the full toolkit
+- **[`awnode`](awnode.md)** — expose this machine's hardware to any MCP-capable agent
+- **[`awdk`](awdk.md)** — the full toolkit

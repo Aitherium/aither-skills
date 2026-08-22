@@ -74,7 +74,7 @@ mcp_servers:
 servers) — not both. Get a scoped key with the toolkit rather than reusing a personal one:
 
 ```bash
-pip install aither-adk
+pip install awdk
 adk connect          # writes the gateway URL + a scoped key
 ```
 
@@ -91,7 +91,7 @@ Hermes is compatible with the [agentskills.io](https://agentskills.io) standard,
 drops straight in:
 
 ```bash
-bash scripts/install-aither-skills.sh --target hermes
+bash scripts/install-awskills.sh --target hermes
 ```
 
 Or by hand: `~/.hermes/skills/<name>/SKILL.md`. See [`install-skills`](install-skills.md).
@@ -150,4 +150,4 @@ for Nous Hermes models and the many fine-tunes that adopted it. Full table in
 
 - **[`openclaw`](openclaw.md)** — the same wiring for OpenClaw
 - **[`local-inference`](local-inference.md)** — the endpoint Hermes points at
-- **[`aither-adk`](aither-adk.md)** — the toolkit that provides the MCP tools
+- **[`awdk`](awdk.md)** — the toolkit that provides the MCP tools

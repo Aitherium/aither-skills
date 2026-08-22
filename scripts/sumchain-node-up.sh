@@ -13,7 +13,7 @@
 # The devnet config is injected by the caller as base64 env vars (SSOT stays in the
 # AitherOS repo at AitherOS/external/sumchain-devnet/), so this script embeds no secrets.
 #
-# Usage (driven by AitherOS/scripts/omninode_sumchain_up.py — the sanctioned fleet tool):
+# Usage (driven by the sanctioned fleet tool, omninode_sumchain_up.py):
 #   SUMCHAIN_GENESIS_B64=... SUMCHAIN_VALKEY_B64=... SUMCHAIN_NODETOML_B64=... \
 #     ./sumchain-node-up.sh [--run|--verify]
 #
@@ -50,7 +50,7 @@ command -v cargo >/dev/null 2>&1 || die "cargo not on PATH after install"
 _have_linker() { command -v cc >/dev/null 2>&1 || command -v gcc >/dev/null 2>&1 || command -v clang >/dev/null 2>&1; }
 # sum-chain deps (openssl-sys) need pkg-config + the openssl DEV package (headers +
 # openssl.pc), which are NOT implied by a present C linker or the runtime libssl.so
-# (the D-499 landmine). Detecting the runtime .so is not enough — openssl-sys needs the
+# (the openssl-sys landmine). Detecting the runtime .so is not enough — openssl-sys needs the
 # -dev package's openssl.pc. So: install the full native-build set UNCONDITIONALLY
 # (idempotent) and then VERIFY pkg-config can actually resolve openssl before building.
 export DEBIAN_FRONTEND=noninteractive
@@ -105,7 +105,7 @@ git checkout --quiet "$REF" 2>/dev/null || git checkout --quiet "origin/$REF" 2>
 echo "   revision $(git rev-parse --short HEAD)"
 
 # rustls-only where a crate offers the choice (the fleet nodes have no openssl-sys/pkg
-# native-tls path — this bit us on the snip-strata adapter, D-499). Harmless if unused.
+# native-tls path — this bit us on the snip-strata adapter). Harmless if unused.
 export SUMCHAIN_REQWEST_RUSTLS=1
 
 BIN="$ROOT/src/target/release/sumchain"

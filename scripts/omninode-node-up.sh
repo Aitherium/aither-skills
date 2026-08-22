@@ -10,7 +10,7 @@
 #      or (--listen) run a persistent node that serves shards on the mesh.
 #
 # OmniNode Protocol is by SUM-INNOVATION — https://github.com/SUM-INNOVATION/OmniNode-Protocol
-# This bootstrap is MIT-licensed, part of https://github.com/Aitherium/aither-skills — use it,
+# This bootstrap is MIT-licensed, part of https://github.com/Aitherium/awskills — use it,
 # fork it, or go straight to the upstream source. No prior Rust experience required.
 #
 # Usage:
@@ -98,15 +98,15 @@ case "$MODE" in
     kill "$LPID" 2>/dev/null || true
     if [ "$ok" = 0 ]; then
       printf '\033[32m== NODE OK — omni-node built and P2P discovery works on this machine.\033[0m\n'
-      # ── optional: enroll into the AitherMesh fabric so aither-adk agents can use this node ──
-      # Seamless with the aither-adk / AitherNode / AitherConnect / AitherMesh substrate: if the
+      # ── optional: enroll into the AitherMesh fabric so awdk agents can use this node ──
+      # Seamless with the awdk / awnode / Awconnect / AitherMesh substrate: if the
       # `adk` CLI is present (or you pass --adk), join this box to the AitherMesh WireGuard overlay
       # so adk agents discover it as a mesh peer. Fully optional — OmniNode works standalone.
       if command -v adk >/dev/null 2>&1 && { [ "${OMNINODE_ADK:-}" = "1" ] || [ "${2:-}" = "--adk" ]; }; then
-        say "aither-adk detected — onboarding this node into AitherMesh"
+        say "awdk detected — onboarding this node into AitherMesh"
         adk mesh onboard --role worker || echo "   (adk mesh onboard skipped/failed — non-fatal; node still works standalone)"
       elif command -v adk >/dev/null 2>&1; then
-        echo "   aither-adk detected: run 'adk mesh onboard --role worker' to join this node to the mesh,"
+        echo "   awdk detected: run 'adk mesh onboard --role worker' to join this node to the mesh,"
         echo "   or re-run with --adk to do it automatically."
       fi
       echo "   run a persistent node with:  $0 --listen"

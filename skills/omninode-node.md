@@ -32,9 +32,9 @@ Exit 0 with `NODE OK` means the binary built and peer discovery works on your ma
 doesn't complete, it's almost always a firewall or an mDNS-unfriendly network — the build itself is
 fine.
 
-## Works with aither-adk agents
+## Works with awdk agents
 
-If you also run [aither-adk](https://github.com/Aitherium/aither-adk), this node slots straight into
+If you also run [awdk](https://github.com/Aitherium/awdk), this node slots straight into
 the agent substrate. When the `adk` CLI is on your PATH the script offers to enroll the node into the
 **AitherMesh** overlay so adk agents discover it as a mesh peer:
 
@@ -45,7 +45,8 @@ adk mesh onboard --role worker           # join this box to the mesh
 adk mesh ls                              # see the peers your agents can reach
 ```
 
-The goal is a single, coherent substrate — **aither-adk / AitherNode / AitherConnect / AitherMesh +
+The goal is a single, coherent substrate — **awdk / awnode / AitherConnect / AitherMesh +
+The goal is a single, coherent substrate — **aither-adk / AitherNode / Awconnect / AitherMesh +
 OmniNode** — where standing up compute and having your agents use it is one motion, not two projects.
 
 ## Notes
@@ -56,5 +57,5 @@ OmniNode** — where standing up compute and having your agents use it is one mo
   up for a service.
 - **Go straight to the source** any time: <https://github.com/SUM-INNOVATION/OmniNode-Protocol>.
 
-MIT-licensed, like everything in `aither-skills`. Built because an autonomous agent (or a human)
+MIT-licensed, like everything in `awskills`. Built because an autonomous agent (or a human)
 should be able to turn a spare machine into a mesh node with one command — not a ten-step wiki page.

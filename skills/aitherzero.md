@@ -95,11 +95,11 @@ Wrote .../config-schema.json — 69 scripts with a configurable surface, 9 categ
 
 ## Drive it from an agent
 
-The `aitherzero` tool pack gives an [aither-adk](aither-adk.md) agent the same surface as tools,
+The `aitherzero` tool pack gives an [awdk](awdk.md) agent the same surface as tools,
 so an agent can inventory scripts, validate configs, and plan deployments:
 
 ```bash
-pip install aither-adk
+pip install awdk
 python -m adk.toolpacks.aitherzero inventory
 python -m adk.toolpacks.aitherzero describe 1002
 python -m adk.toolpacks.aitherzero validate --path config.local.psd1
@@ -132,8 +132,10 @@ public one, verified against this repository.
 
 ## Part of one substrate
 
+AitherZero provisions the box; [awnode](awnode.md) makes its hardware usable,
+[AitherConnect](aitherconnect.md) wires it to the fleet, [awdk](awdk.md) is the runtime
 AitherZero provisions the box; [AitherNode](aithernode.md) makes its hardware usable,
-[AitherConnect](aitherconnect.md) wires it to the fleet, [aither-adk](aither-adk.md) is the runtime
+[Awconnect](awconnect.md) wires it to the fleet, [awdk](awdk.md) is the runtime
 that drives all of it, and [OmniNode](omninode-node.md) pools the results into one compute fabric.
 
-MIT-licensed, like everything in `aither-skills`.
+MIT-licensed, like everything in `awskills`.

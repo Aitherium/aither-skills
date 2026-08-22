@@ -16,8 +16,8 @@ This skill supplements [code-like-david](code-like-david.md) with AitherOS-speci
 ## Quick start (60 seconds)
 
 ```bash
-# 1. Install aither-adk
-pip install aither-adk   # or: pip install -e ./aither-adk (from repo)
+# 1. Install awdk
+pip install awdk   # or: pip install -e ./awdk (from repo)
 
 # 2. Store your API key
 adk keys set deepseek    # paste your DeepSeek API key (stored locally only)

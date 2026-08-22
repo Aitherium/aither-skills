@@ -138,4 +138,4 @@ paths that always return empty pass every "returns nothing" assertion trivially.
 survives a restart. If your monitoring can't tell "working" from "inert", it will report
 inert as healthy indefinitely — ours did, for months.
 
-MIT-licensed, like everything in `aither-skills`.
+MIT-licensed, like everything in `awskills`.

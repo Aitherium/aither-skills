@@ -45,7 +45,7 @@ same layer. Three moving parts are needed:
 │    "budget_usd": 50.00                  │  ← fail-closed cost guard
 │  }                                      │
 └─────────────────────────────────────────┘
-              ↓ (deployment service :8150)
+              ↓ (AitherComet :8126, TLS)
          Cloud router
               ↓
      ┌───────┴────────┐
@@ -89,9 +89,9 @@ vault if you need it retrievable:
 # service's known types -- api_key / token / password / certificate /
 # private_key / connection_string / generic. Passing "ssh_key" is rejected,
 # and the rejection surfaces only as a generic "failed to store".
-from lib.agents.AitherSecretsClient import AitherSecretsClient
+from your_platform.secrets import SecretsClient   # your own vault client
 
-await AitherSecretsClient().store(
+await SecretsClient().store(
     "HETZNER_SSH_PRIVATE_KEY",
     private_key_pem,
     secret_type="private_key",
@@ -132,9 +132,9 @@ AitherComet reads `HETZNER_API_KEY` from the vault at provisioning time. If you'
 hosting, you must store it first:
 
 ```python
-from lib.agents.AitherSecretsClient import AitherSecretsClient
+from your_platform.secrets import SecretsClient   # your own vault client
 
-await AitherSecretsClient().store(
+await SecretsClient().store(
     "HETZNER_API_KEY", "<your-token-from-the-Hetzner-console>",
     secret_type="api_key", access_level="internal",
 )
@@ -144,7 +144,7 @@ Then prove the round-trip before relying on it — a write that 401s and a secre
 simply is not set look identical at every later call site:
 
 ```python
-from lib.core.get_secret import get_secret   # your platform's read helper
+from your_platform.secrets import get_secret   # your platform's read helper
 assert get_secret("HETZNER_API_KEY"), "vault readback failed"
 ```
 
@@ -158,10 +158,26 @@ curl -X GET http://127.0.0.1:8111/secrets/HETZNER_API_KEY \
 
 ## Provisioning a server
 
+> **Note (measured live 2026-08-18):** AitherComet is published on host **8126**
+> (container 8125). The port `:8150` this runbook used to name is the LLM router;
+> every command here pointed at a service that could not answer it.
+>
+> **TRY BOTH SCHEMES — the scheme is NOT stable across restarts.** On its first boot
+> this service logged `Uvicorn running on https://0.0.0.0:8125` and answered only
+> `https://`; after a restart the same container answered only `http://`, and the
+> HTTPS probes showed up in its own log as `Invalid HTTP request received`. Pinning
+> either spelling is a latent outage: the wrong one returns `000`, which reads as
+> "the service is down" while it is `Up (healthy)` and serving. Probe `http://` and
+> `https://` (with `-k`) and take whichever answers.
+>
+> If `/deploy` does not respond at all, check whether the unit is **masked** before
+> concluding the service is retired: a masked quadlet leaves no container, running or
+> stopped, so `podman ps -a` shows nothing and it looks like it was never deployed.
+
 Use AitherComet's `/deploy` endpoint:
 
 ```bash
-curl -X POST http://127.0.0.1:8150/deploy \
+curl -X POST http://127.0.0.1:8126/deploy \
   -H "Content-Type: application/json" \
   -d '{
     "deployment_id": "model-inference-run-abc123",
@@ -204,7 +220,7 @@ curl -X POST http://127.0.0.1:8150/deploy \
 Poll the deployment status:
 
 ```bash
-curl -X GET http://127.0.0.1:8150/deployments/model-inference-run-abc123
+curl -X GET http://127.0.0.1:8126/deployments/model-inference-run-abc123
 # Shows: status in [provisioning, starting, running, failed, destroyed]
 ```
 
@@ -302,17 +318,17 @@ Once provisioned, you manage the instance via `/deployments/{id}` endpoints:
 
 ```bash
 # Get current status
-curl -X GET http://127.0.0.1:8150/deployments/model-inference-run-abc123
+curl -X GET http://127.0.0.1:8126/deployments/model-inference-run-abc123
 
 # Stop (suspend without destroying) — keeps the instance and its data
-curl -X POST http://127.0.0.1:8150/deployments/model-inference-run-abc123/stop
+curl -X POST http://127.0.0.1:8126/deployments/model-inference-run-abc123/stop
 # Hetzner respects the stopped state; you''re charged ~10% of running cost while stopped
 
 # Start (resume from stopped state)
-curl -X POST http://127.0.0.1:8150/deployments/model-inference-run-abc123/start
+curl -X POST http://127.0.0.1:8126/deployments/model-inference-run-abc123/start
 
 # Destroy (irreversible; data is gone)
-curl -X POST http://127.0.0.1:8150/deployments/model-inference-run-abc123/teardown
+curl -X POST http://127.0.0.1:8126/deployments/model-inference-run-abc123/teardown
 # Hetzner immediately powers down and deallocates the instance.
 # No backup, no recovery, no "are you sure?" — be sure before you send this.
 ```

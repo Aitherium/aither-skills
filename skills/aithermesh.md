@@ -65,9 +65,12 @@ nodes reachable over `10.77.x.x` and the agents discoverable to each other.
 ## Part of one substrate
 
 The mesh is the fabric the rest ride on: [AitherConnect](aitherconnect.md) is the per-machine seam
+onto it (`adk mesh onboard`), an [awnode](awnode.md) is a machine made useful on it,
+[awdk](awdk.md) is the agent runtime that spans it, [AitherZero](aitherzero.md) provides
+The mesh is the fabric the rest ride on: [Awconnect](awconnect.md) is the per-machine seam
 onto it (`adk mesh onboard`), an [AitherNode](aithernode.md) is a machine made useful on it,
-[aither-adk](aither-adk.md) is the agent runtime that spans it, [AitherZero](aitherzero.md) provides
+[awdk](awdk.md) is the agent runtime that spans it, [AitherZero](aitherzero.md) provides
 the automation-scripts this skill drives, and [OmniNode](omninode-node.md) pools the nodes into one
 compute fabric over it. One motion, not five.
 
-MIT-licensed, like everything in `aither-skills`.
+MIT-licensed, like everything in `awskills`.

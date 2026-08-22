@@ -31,9 +31,9 @@ Every execution is a **run** with per-cell traces, token/cost totals, and a stat
 run as the **baseline**, then `diff` or `replay` future runs against it — "change the prompt /
 a variable / the model and see how it changes the result" without touching the original.
 
-## Use it from aither-adk
+## Use it from awdk
 
-The `notebooks` tool category ships with [aither-adk](aither-adk.md) — it proxies the Genesis
+The `notebooks` tool category ships with [awdk](awdk.md) — it proxies the Genesis
 `/notebooks/*` API (the same surface the portal notebook UI drives). Agents with the
 `demiurge`, `atlas`, or `analyst` identity get these tools by default; add them to any agent
 with `--tools notebooks` (or `apply_pack`).
@@ -97,4 +97,4 @@ you're logged in. Verified live end-to-end as an authenticated user: `create →
 work and writes return a clean `{"error": "HTTP 403 …"}` — the tools degrade, never crash the
 agent loop.
 
-MIT-licensed, like everything in `aither-skills`.
+MIT-licensed, like everything in `awskills`.

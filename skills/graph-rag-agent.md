@@ -1,13 +1,13 @@
 # graph-rag-agent — build a knowledge graph and an agent that owns it
 
-Point [aither-adk](aither-adk.md) at a folder of documents (or a codebase) and it builds a
+Point [awdk](awdk.md) at a folder of documents (or a codebase) and it builds a
 **knowledge graph** — chunked, embedded, and linked — then give a dedicated agent that graph as its
 memory so it answers from *your* material instead of guessing. This is graph RAG without standing up
 a vector database yourself: ingestion, storage, retrieval, and the agent are one toolkit.
 
 ## Build the knowledge graph
 
-With aither-adk installed (`pip install aither-adk`):
+With awdk installed (`pip install awdk`):
 
 ```bash
 # Ingest a folder into a named agent's knowledge graph (chunk + embed + link).
@@ -61,8 +61,8 @@ adk chat research                       # "what changed since last week?" — it
 
 ## Part of one substrate
 
-The agent runs on [aither-adk](aither-adk.md), the graph lives on an [AitherNode](aithernode.md) you
+The agent runs on [awdk](awdk.md), the graph lives on an [awnode](awnode.md) you
 own, point it at a local model (see [bonsai-27b](bonsai-27b.md) for a CPU-friendly one), and share
 the assistant across a fleet over [AitherMesh](aithermesh.md).
 
-MIT-licensed, like everything in `aither-skills`.
+MIT-licensed, like everything in `awskills`.

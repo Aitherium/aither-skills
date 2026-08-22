@@ -1,6 +1,6 @@
-# aither-discord-agent — deploy your aither-adk agent as a Discord bot (automated onboarding)
+# aither-discord-agent — deploy your awdk agent as a Discord bot (automated onboarding)
 
-Your aither-adk agent already has an identity, tools, memory, and inference on your own machine.
+Your awdk agent already has an identity, tools, memory, and inference on your own machine.
 This skill turns it into a **Discord bot** with **one automated onboarding command** —
 `adk onboard --discord` — which installs your agent pack, **validates your bot token live against
 Discord's API**, prints the invite link, verifies your identity + tools, and can launch the bot.
@@ -11,7 +11,7 @@ Program and customize behavior by editing the pack, not the bot.
 ## What you need
 
 - A Discord account and a server you can add a bot to.
-- A machine that already runs aither-adk (see the `aither-start` skill to get there).
+- A machine that already runs awdk (see the `aither-start` skill to get there).
 
 ## Step 1 — create the bot
 
@@ -25,7 +25,7 @@ That's all you create. You do **not** hand-build an invite link — onboarding g
 ## Step 2 — run the automated onboarding
 
 ```bash
-pip install 'aither-adk[channels]'      # the toolkit + discord.py
+pip install 'awdk[channels]'      # the toolkit + discord.py
 adk onboard --discord --identity <your-agent> --pack <your-pack>
 ```
 
@@ -67,7 +67,7 @@ Edit the pack, not the bot, then re-run onboarding:
 
 ## The two client paths (and why you don't need a paid tier)
 
-- **Built-in adapter:** aither-adk ships a `DiscordAdapter` (`adk.channels`) with mention/DM handling
+- **Built-in adapter:** awdk ships a `DiscordAdapter` (`adk.channels`) with mention/DM handling
   and chunking built in. It is gated to the **`channels`** capability (a paid tier) — onboarding
   tries it first.
 - **Hand-rolled client:** if the adapter isn't available or isn't entitled, onboarding falls back to a
@@ -76,10 +76,10 @@ Edit the pack, not the bot, then re-run onboarding:
 
 ## Standalone alternative (no `adk onboard` yet)
 
-If you're on an older aither-adk without `--discord`, the same flow ships as a standalone launcher:
+If you're on an older awdk without `--discord`, the same flow ships as a standalone launcher:
 
 ```bash
-git clone https://github.com/Aitherium/aither-skills && cd aither-skills
+git clone https://github.com/Aitherium/awskills && cd awskills
 python tools/discord-agent-bot.py --check --identity <your-agent>   # the gate
 DISCORD_BOT_TOKEN=<token> python tools/discord-agent-bot.py --identity <your-agent>
 ```
@@ -88,12 +88,12 @@ DISCORD_BOT_TOKEN=<token> python tools/discord-agent-bot.py --identity <your-age
 
 - The bot token is a **secret**: pass it via `DISCORD_BOT_TOKEN` or `--token`, never commit it, and
   use the minimal bot scope. Reset it in the Developer Portal if it ever leaks.
-- The agent runs with the same privileges you gave your aither-adk setup — don't point it at Discord
+- The agent runs with the same privileges you gave your awdk setup — don't point it at Discord
   channels you wouldn't let it act on.
 
 ## Troubleshooting
 
-- **`discord.py required`** → `pip install 'aither-adk[channels]'`.
+- **`discord.py required`** → `pip install 'awdk[channels]'`.
 - **Onboarding says the token is invalid/revoked** → reset it in the Developer Portal, re-export
   `DISCORD_BOT_TOKEN`, re-run. The onboarding never proceeds past a bad token.
 - **`identity did not resolve`** → the pack installed but the identity file isn't where the agent

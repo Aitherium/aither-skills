@@ -13,7 +13,7 @@ you can track it. So the ADK resolves the binary that is actually installed and 
 ## See what this machine can drive
 
 ```bash
-adk shell harnesses
+adk harness harnesses
 ```
 
 ```
@@ -23,7 +23,8 @@ gemini       yes        oneshot-per-turn  Google Gemini CLI — one process per 
 terminal     yes        pty-stream        A real shell behind a pseudo-terminal (pwsh/bash)
 sandbox      NO         pty-stream        A real Linux TTY inside a dev container
                                           -> Install Docker Desktop
-acp          yes        structured-bidi   JSON-RPC 2.0 stdio harness for JetBrains/Zed/VS Code
+aither       yes        http-stream       An AitherOS agent relayed over SSE
+group        yes        http-stream       Several agents in one room, answering concurrently
 codex        NO         oneshot-per-turn  OpenAI Codex CLI (codex exec --json)
                                           -> npm i -g @openai/codex
 aider        NO         oneshot-per-turn  Aider — pair-programming CLI
@@ -32,6 +33,10 @@ opencode     NO         oneshot-per-turn  OpenCode — open-source coding agent
                                           -> npm i -g opencode-ai
 ```
 
+The `installed` column is per-machine — yours will differ. **ACP is not in this
+table.** An ACP agent is driven as a *model backend*, not as a harness session;
+see `acp-drive` below.
+
 A harness you have not installed says **NO** and prints the command to get it. That
 is deliberate: an absent harness is a missing install, not a missing feature, and
 the difference is printed rather than guessed at.
@@ -39,16 +44,21 @@ the difference is printed rather than guessed at.
 ## Drive one
 
 ```bash
-adk shell new --harness claude          # start a session, get an id
-adk shell send  <id> "refactor the retry logic in billing/"
-adk shell attach <id>                   # watch it work, live
-adk shell list                          # what's running
-adk shell kill  <id>                    # teardown, whole process tree
+adk harness serve                         # run the daemon (127.0.0.1:8362)
+adk harness new --harness claude          # start a session, get an id
+adk harness send  <id> "refactor the retry logic in billing/"
+adk harness attach <id>                   # watch it work, live
+adk harness list                          # what's running
+adk harness kill  <id>                    # teardown, whole process tree
 ```
 
-`adk shell wrap` puts an existing local command behind the same session interface,
-and `adk shell serve` exposes the whole thing over HTTP so a remote agent can drive
-it.
+`adk harness serve` exposes the whole thing over HTTP so a remote agent can drive
+it. `adk harness agents` and `adk harness profiles` list the sovereign agents and
+the per-session model profiles available to you.
+
+**Note the namespace is `adk harness`, not `adk shell`.** `adk shell` is a
+different command — a passthrough to the AitherShell binary — and it does not
+understand any of the subcommands above.
 
 ## The four transports, and why the distinction matters
 
@@ -125,4 +135,4 @@ stay in your own loop.
 
 - `acp-drive` — driving an external ACP agent as a model backend
 - `acp-serve` — serving *your* agent to an editor over ACP
-- `aither-adk` — the SDK these harnesses hang off
+- `awdk` — the SDK these harnesses hang off

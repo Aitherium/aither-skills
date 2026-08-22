@@ -121,4 +121,4 @@ error.
 - **[`local-inference`](local-inference.md)** — model sizing and quantization, applies to ODS's llama-server too
 - **[`hermes-agent`](hermes-agent.md)** — the agent ODS bundles
 - **[`aither-start`](aither-start.md)** — the guided path this plugs into
-- **[`aithernode`](aithernode.md)** — expose this box's GPU/files to agents over MCP
+- **[`awnode`](awnode.md)** — expose this box's GPU/files to agents over MCP

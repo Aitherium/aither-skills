@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Install the aither-skills pack into whatever agents are on this machine.
+    Install the awskills pack into whatever agents are on this machine.
 
 .DESCRIPTION
     Two skill layouts exist in the wild, and installing the wrong one is why an agent
@@ -87,7 +87,7 @@ $targets = @(
 )
 
 Write-Host ""
-Write-Host "  aither-skills installer"
+Write-Host "  awskills installer"
 Write-Host "  source: $srcDir"
 Write-Host ""
 

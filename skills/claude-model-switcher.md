@@ -37,8 +37,8 @@ Claude Code CLI
 ## Quick start
 
 ```bash
-# 1. Install aither-adk (if not already)
-pip install -e ./aither-adk
+# 1. Install awdk (if not already)
+pip install -e ./awdk
 
 # 2. Store your API key (local only, never sent anywhere)
 adk keys set deepseek     # paste your DeepSeek API key
@@ -192,7 +192,7 @@ adk claude-model bridge stop    # kill it
 Any provider with an Anthropic-compatible `/v1/messages` endpoint works:
 
 ```yaml
-# In AitherOS/config/claude_profiles.yaml:
+# In your claude_profiles.yaml:
 my-provider:
   transport: native
   description: "My Provider (native Anthropic API)"
